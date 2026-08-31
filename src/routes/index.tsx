@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { MappingFields } from "@/components/mapping-fields";
-import { parseSpreadsheet, type ParsedSheet } from "@/lib/spreadsheet";
+import { parseSpreadsheet, type ParsedSheet, type ParsedWorkbook } from "@/lib/spreadsheet";
 import {
   datasetsQuery,
   deleteDataset,
