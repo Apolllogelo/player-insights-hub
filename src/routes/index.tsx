@@ -52,12 +52,15 @@ function Home() {
   const players = useQuery(playersQuery);
 
   const fileRef = useRef<HTMLInputElement>(null);
-  const [sheet, setSheet] = useState<ParsedSheet | null>(null);
+  const [workbook, setWorkbook] = useState<ParsedWorkbook | null>(null);
+  const [sheetIndex, setSheetIndex] = useState(0);
   const [fileName, setFileName] = useState("");
   const [playerType, setPlayerType] = useState("");
   const [idMap, setIdMap] = useState<IdMap>(emptyIdMap);
   const [metrics, setMetrics] = useState<Metric[]>([]);
   const [importing, setImporting] = useState(false);
+
+  const sheet: ParsedSheet | null = workbook?.sheets[sheetIndex] ?? null;
 
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
