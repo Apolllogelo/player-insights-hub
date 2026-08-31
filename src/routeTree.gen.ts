@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as MapearRouteImport } from './routes/mapear'
+import { Route as JogadorIdRouteImport } from './routes/jogador.$id'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -22,31 +23,40 @@ const MapearRoute = MapearRouteImport.update({
   path: '/mapear',
   getParentRoute: () => rootRouteImport,
 } as any)
+const JogadorIdRoute = JogadorIdRouteImport.update({
+  id: '/jogador/$id',
+  path: '/jogador/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/mapear': typeof MapearRoute
+  '/jogador/$id': typeof JogadorIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/mapear': typeof MapearRoute
+  '/jogador/$id': typeof JogadorIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/mapear': typeof MapearRoute
+  '/jogador/$id': typeof JogadorIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/mapear'
+  fullPaths: '/' | '/mapear' | '/jogador/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/mapear'
-  id: '__root__' | '/' | '/mapear'
+  to: '/' | '/mapear' | '/jogador/$id'
+  id: '__root__' | '/' | '/mapear' | '/jogador/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   MapearRoute: typeof MapearRoute
+  JogadorIdRoute: typeof JogadorIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -65,12 +75,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MapearRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/jogador/$id': {
+      id: '/jogador/$id'
+      path: '/jogador/$id'
+      fullPath: '/jogador/$id'
+      preLoaderRoute: typeof JogadorIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   MapearRoute: MapearRoute,
+  JogadorIdRoute: JogadorIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
