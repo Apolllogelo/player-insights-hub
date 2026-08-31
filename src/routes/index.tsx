@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { MappingFields } from "@/components/mapping-fields";
-import { parseSpreadsheet, type ParsedSheet } from "@/lib/spreadsheet";
+import { parseSpreadsheet, type ParsedSheet, type ParsedWorkbook } from "@/lib/spreadsheet";
 import {
   datasetsQuery,
   deleteDataset,
@@ -52,12 +52,15 @@ function Home() {
   const players = useQuery(playersQuery);
 
   const fileRef = useRef<HTMLInputElement>(null);
-  const [sheet, setSheet] = useState<ParsedSheet | null>(null);
+  const [workbook, setWorkbook] = useState<ParsedWorkbook | null>(null);
+  const [sheetIndex, setSheetIndex] = useState(0);
   const [fileName, setFileName] = useState("");
   const [playerType, setPlayerType] = useState("");
   const [idMap, setIdMap] = useState<IdMap>(emptyIdMap);
   const [metrics, setMetrics] = useState<Metric[]>([]);
   const [importing, setImporting] = useState(false);
+
+  const sheet: ParsedSheet | null = workbook?.sheets[sheetIndex] ?? null;
 
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
@@ -83,28 +86,47 @@ function Home() {
   async function handleFile(file: File) {
     try {
       const parsed = await parseSpreadsheet(file);
-      if (!parsed.columns.length) {
+      if (!parsed.sheets.length) {
         toast.error("Não encontrei colunas nessa planilha.");
         return;
       }
-      setSheet(parsed);
+      setWorkbook(parsed);
       setFileName(file.name);
-      setPlayerType("");
-      setIdMap(emptyIdMap);
       setMetrics([]);
-      toast.success(`${parsed.rows.length} linhas e ${parsed.columns.length} colunas lidas.`);
+      setIdMap(emptyIdMap);
+      selectSheet(parsed, 0);
+      toast.success(
+        parsed.sheets.length > 1
+          ? `${parsed.sheets.length} abas lidas. Escolha qual quer importar.`
+          : `${parsed.sheets[0]!.rows.length} linhas e ${parsed.sheets[0]!.columns.length} colunas lidas.`,
+      );
     } catch {
       toast.error("Não consegui ler o arquivo. Use CSV ou Excel (.xlsx).");
     }
   }
 
-  function applyProfile(type: string) {
+  /** "🛡️Zagueiros" → "zagueiros" */
+  function suggestType(sheetName: string) {
+    return sheetName
+      .replace(/[^\p{L}\p{N}\s/-]/gu, "")
+      .trim()
+      .toLowerCase();
+  }
+
+  function selectSheet(book: ParsedWorkbook, index: number) {
+    setSheetIndex(index);
+    const target = book.sheets[index];
+    if (!target) return;
+    applyProfile(suggestType(target.name), target);
+  }
+
+  function applyProfile(type: string, target: ParsedSheet | null = sheet) {
     setPlayerType(type);
     const profile = (profiles.data ?? []).find(
       (p) => p.player_type.toLowerCase() === type.trim().toLowerCase(),
     );
-    if (profile && sheet) {
-      const known = new Set(sheet.columns);
+    if (profile && target) {
+      const known = new Set(target.columns);
       setIdMap({
         name: known.has(profile.id_map.name) ? profile.id_map.name : "",
         club: known.has(profile.id_map.club) ? profile.id_map.club : "",
@@ -113,6 +135,9 @@ function Home() {
         minutes: known.has(profile.id_map.minutes) ? profile.id_map.minutes : "",
       });
       setMetrics(profile.metrics.filter((m) => known.has(m.column)));
+    } else if (target) {
+      setIdMap((prev) => (target.columns.includes(prev.name) ? prev : emptyIdMap));
+      setMetrics((prev) => prev.filter((m) => target.columns.includes(m.column)));
     }
   }
 
@@ -134,7 +159,7 @@ function Home() {
     setImporting(true);
     try {
       await importDataset({
-        name: fileName,
+        name: workbook && workbook.sheets.length > 1 ? `${fileName} · ${sheet.name}` : fileName,
         player_type: playerType.trim(),
         columns: sheet.columns,
         rows: sheet.rows,
@@ -142,7 +167,7 @@ function Home() {
         metrics: validMetrics.map((m) => ({ ...m, label: m.label || m.column })),
       });
       await queryClient.invalidateQueries();
-      setSheet(null);
+      setWorkbook(null);
       setFileName("");
       if (fileRef.current) fileRef.current.value = "";
       toast.success("Planilha importada.");
@@ -192,9 +217,34 @@ function Home() {
           <span className="text-sm text-muted-foreground">
             {sheet
               ? `${fileName} · ${sheet.rows.length} jogadores · ${sheet.columns.length} colunas`
-              : "CSV ou Excel (.xlsx)"}
+              : "CSV ou Excel (.xlsx) — cada aba pode ser um tipo de jogador"}
           </span>
         </div>
+
+        {workbook && workbook.sheets.length > 1 && (
+          <div className="mt-5 space-y-2">
+            <Label className="text-xs text-muted-foreground">
+              Abas encontradas — importe uma por vez
+            </Label>
+            <div className="flex flex-wrap gap-2">
+              {workbook.sheets.map((s, i) => (
+                <button
+                  key={s.name}
+                  type="button"
+                  onClick={() => selectSheet(workbook, i)}
+                  className={`rounded-full border px-3 py-1.5 text-xs transition-colors ${
+                    i === sheetIndex
+                      ? "border-primary bg-primary/15 text-primary"
+                      : "border-border/70 bg-secondary text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {s.name}
+                  <span className="ml-1.5 opacity-60">{s.rows.length}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {sheet && (
           <div className="mt-6 space-y-6 border-t border-border/70 pt-6">
@@ -231,7 +281,7 @@ function Home() {
               <Button onClick={() => void handleImport()} disabled={importing}>
                 {importing ? "Importando…" : "Salvar mapeamento e importar"}
               </Button>
-              <Button variant="ghost" onClick={() => setSheet(null)}>
+              <Button variant="ghost" onClick={() => setWorkbook(null)}>
                 Cancelar
               </Button>
             </div>
