@@ -159,7 +159,7 @@ function Home() {
     setImporting(true);
     try {
       await importDataset({
-        name: fileName,
+        name: workbook && workbook.sheets.length > 1 ? `${fileName} · ${sheet.name}` : fileName,
         player_type: playerType.trim(),
         columns: sheet.columns,
         rows: sheet.rows,
@@ -167,7 +167,7 @@ function Home() {
         metrics: validMetrics.map((m) => ({ ...m, label: m.label || m.column })),
       });
       await queryClient.invalidateQueries();
-      setSheet(null);
+      setWorkbook(null);
       setFileName("");
       if (fileRef.current) fileRef.current.value = "";
       toast.success("Planilha importada.");
