@@ -281,7 +281,7 @@ function Home() {
               <Button onClick={() => void handleImport()} disabled={importing}>
                 {importing ? "Importando…" : "Salvar mapeamento e importar"}
               </Button>
-              <Button variant="ghost" onClick={() => setSheet(null)}>
+              <Button variant="ghost" onClick={() => setWorkbook(null)}>
                 Cancelar
               </Button>
             </div>
