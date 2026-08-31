@@ -119,5 +119,20 @@
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
+    font-family: var(--font-sans);
+    background-image: radial-gradient(
+      circle at 20% -10%,
+      color-mix(in oklab, var(--pitch) 10%, transparent),
+      transparent 55%
+    );
+  }
+
+  h1,
+  h2,
+  h3,
+  .font-display {
+    font-family: var(--font-display);
+    letter-spacing: -0.01em;
   }
 }
+
