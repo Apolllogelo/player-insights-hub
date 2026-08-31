@@ -14,7 +14,107 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      datasets: {
+        Row: {
+          columns: Json
+          created_at: string
+          id: string
+          name: string
+          player_type: string
+          row_count: number
+        }
+        Insert: {
+          columns?: Json
+          created_at?: string
+          id?: string
+          name: string
+          player_type: string
+          row_count?: number
+        }
+        Update: {
+          columns?: Json
+          created_at?: string
+          id?: string
+          name?: string
+          player_type?: string
+          row_count?: number
+        }
+        Relationships: []
+      }
+      players: {
+        Row: {
+          age: number | null
+          club: string | null
+          created_at: string
+          data: Json
+          dataset_id: string
+          id: string
+          minutes: number | null
+          name: string
+          player_type: string
+          position: string | null
+        }
+        Insert: {
+          age?: number | null
+          club?: string | null
+          created_at?: string
+          data?: Json
+          dataset_id: string
+          id?: string
+          minutes?: number | null
+          name: string
+          player_type: string
+          position?: string | null
+        }
+        Update: {
+          age?: number | null
+          club?: string | null
+          created_at?: string
+          data?: Json
+          dataset_id?: string
+          id?: string
+          minutes?: number | null
+          name?: string
+          player_type?: string
+          position?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "players_dataset_id_fkey"
+            columns: ["dataset_id"]
+            isOneToOne: false
+            referencedRelation: "datasets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      position_profiles: {
+        Row: {
+          created_at: string
+          id: string
+          id_map: Json
+          metrics: Json
+          player_type: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          id_map?: Json
+          metrics?: Json
+          player_type: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          id_map?: Json
+          metrics?: Json
+          player_type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
