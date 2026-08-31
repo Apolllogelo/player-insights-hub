@@ -86,28 +86,47 @@ function Home() {
   async function handleFile(file: File) {
     try {
       const parsed = await parseSpreadsheet(file);
-      if (!parsed.columns.length) {
+      if (!parsed.sheets.length) {
         toast.error("Não encontrei colunas nessa planilha.");
         return;
       }
-      setSheet(parsed);
+      setWorkbook(parsed);
       setFileName(file.name);
-      setPlayerType("");
-      setIdMap(emptyIdMap);
       setMetrics([]);
-      toast.success(`${parsed.rows.length} linhas e ${parsed.columns.length} colunas lidas.`);
+      setIdMap(emptyIdMap);
+      selectSheet(parsed, 0);
+      toast.success(
+        parsed.sheets.length > 1
+          ? `${parsed.sheets.length} abas lidas. Escolha qual quer importar.`
+          : `${parsed.sheets[0]!.rows.length} linhas e ${parsed.sheets[0]!.columns.length} colunas lidas.`,
+      );
     } catch {
       toast.error("Não consegui ler o arquivo. Use CSV ou Excel (.xlsx).");
     }
   }
 
-  function applyProfile(type: string) {
+  /** "🛡️Zagueiros" → "zagueiros" */
+  function suggestType(sheetName: string) {
+    return sheetName
+      .replace(/[^\p{L}\p{N}\s/-]/gu, "")
+      .trim()
+      .toLowerCase();
+  }
+
+  function selectSheet(book: ParsedWorkbook, index: number) {
+    setSheetIndex(index);
+    const target = book.sheets[index];
+    if (!target) return;
+    applyProfile(suggestType(target.name), target);
+  }
+
+  function applyProfile(type: string, target: ParsedSheet | null = sheet) {
     setPlayerType(type);
     const profile = (profiles.data ?? []).find(
       (p) => p.player_type.toLowerCase() === type.trim().toLowerCase(),
     );
-    if (profile && sheet) {
-      const known = new Set(sheet.columns);
+    if (profile && target) {
+      const known = new Set(target.columns);
       setIdMap({
         name: known.has(profile.id_map.name) ? profile.id_map.name : "",
         club: known.has(profile.id_map.club) ? profile.id_map.club : "",
@@ -116,6 +135,9 @@ function Home() {
         minutes: known.has(profile.id_map.minutes) ? profile.id_map.minutes : "",
       });
       setMetrics(profile.metrics.filter((m) => known.has(m.column)));
+    } else if (target) {
+      setIdMap((prev) => (target.columns.includes(prev.name) ? prev : emptyIdMap));
+      setMetrics((prev) => prev.filter((m) => target.columns.includes(m.column)));
     }
   }
 
