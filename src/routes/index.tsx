@@ -217,9 +217,34 @@ function Home() {
           <span className="text-sm text-muted-foreground">
             {sheet
               ? `${fileName} · ${sheet.rows.length} jogadores · ${sheet.columns.length} colunas`
-              : "CSV ou Excel (.xlsx)"}
+              : "CSV ou Excel (.xlsx) — cada aba pode ser um tipo de jogador"}
           </span>
         </div>
+
+        {workbook && workbook.sheets.length > 1 && (
+          <div className="mt-5 space-y-2">
+            <Label className="text-xs text-muted-foreground">
+              Abas encontradas — importe uma por vez
+            </Label>
+            <div className="flex flex-wrap gap-2">
+              {workbook.sheets.map((s, i) => (
+                <button
+                  key={s.name}
+                  type="button"
+                  onClick={() => selectSheet(workbook, i)}
+                  className={`rounded-full border px-3 py-1.5 text-xs transition-colors ${
+                    i === sheetIndex
+                      ? "border-primary bg-primary/15 text-primary"
+                      : "border-border/70 bg-secondary text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {s.name}
+                  <span className="ml-1.5 opacity-60">{s.rows.length}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {sheet && (
           <div className="mt-6 space-y-6 border-t border-border/70 pt-6">
