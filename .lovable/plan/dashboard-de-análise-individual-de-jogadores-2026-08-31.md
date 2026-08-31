@@ -6,15 +6,15 @@ Objetivo: transformar planilhas com 100+ colunas em uma ficha individual limpa, 
 
 1. **Upload** — você sobe o CSV ou Excel (uma planilha por tipo de jogador, ex: goleiro, zagueiro, meia, atacante).
 2. **Mapeamento** — o app lê todos os cabeçalhos e você escolhe, uma vez só, quais colunas correspondem a:
-   - identificação (nome, clube, idade, posição, minutos jogados)
-   - as 14 avaliações daquele tipo de jogador
+  - identificação (nome, clube, idade, posição, minutos jogados)
+  - as 14 avaliações daquele tipo de jogador
    Esse mapeamento fica salvo como um "perfil de posição" e é reutilizado nos próximos uploads do mesmo tipo.
 3. **Ficha individual** — tela principal, limpa:
-   - cabeçalho com nome, clube, idade, posição, minutos
-   - radar com as 14 avaliações (percentil dentro do grupo da mesma posição)
-   - as 14 avaliações em cartões com valor, percentil e barra
-   - bloco **Destaques e Alertas**: pontos fortes (percentil alto) e pontos de atenção (percentil baixo) calculados automaticamente — é isso que evita algo passar batido
-   - acesso a todas as 100+ colunas em uma seção recolhida "Dados completos", para consulta sem poluir a tela
+  - cabeçalho com nome, clube, idade, posição, minutos
+  - radar com as 14 avaliações (percentil dentro do grupo da mesma posição)
+  - as 14 avaliações em cartões com valor, percentil e barra
+  - bloco **Destaques e Alertas**: pontos fortes (percentil alto) e pontos de atenção (percentil baixo) calculados automaticamente — é isso que evita algo passar batido
+  - acesso a todas as 100+ colunas em uma seção recolhida "Dados completos", para consulta sem poluir a tela
 4. **Navegação** — lista lateral/superior com busca e filtro por posição, clube e idade para pular de jogador em jogador.
 
 ## Estrutura de telas
@@ -26,6 +26,7 @@ Objetivo: transformar planilhas com 100+ colunas em uma ficha individual limpa, 
 ## Dados
 
 Uso do Lovable Cloud para que uploads, perfis de posição e jogadores fiquem salvos entre sessões:
+
 - `datasets` — arquivo enviado, tipo de jogador, data
 - `position_profiles` — tipo de jogador + mapeamento das colunas e das 14 avaliações
 - `players` — linhas da planilha (identificação + todas as colunas originais em JSON)
