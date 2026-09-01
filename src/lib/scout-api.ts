@@ -141,3 +141,11 @@ export async function deleteDataset(id: string) {
   const { error } = await supabase.from("datasets").delete().eq("id", id);
   if (error) throw error;
 }
+
+/** Apaga todos os jogadores e planilhas importadas (mantém os perfis de posição). */
+export async function resetPlayers() {
+  const players = await supabase.from("players").delete().not("id", "is", null);
+  if (players.error) throw players.error;
+  const datasets = await supabase.from("datasets").delete().not("id", "is", null);
+  if (datasets.error) throw datasets.error;
+}
