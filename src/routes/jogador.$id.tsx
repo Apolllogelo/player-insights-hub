@@ -14,7 +14,7 @@ import { ArrowLeft, ChevronDown, TrendingUp, TriangleAlert } from "lucide-react"
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { datasetPlayersQuery, playerQuery, profilesQuery } from "@/lib/scout-api";
-import { percentile, toNumber, type Metric } from "@/lib/scout-types";
+import { formatValue, percentile, toNumber, type Metric } from "@/lib/scout-types";
 
 export const Route = createFileRoute("/jogador/$id")({
   head: () => ({
@@ -115,7 +115,22 @@ function PlayerSheet() {
         <div>
           <h1 className="text-3xl font-semibold sm:text-4xl">{p.name}</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            {[p.club, p.position, p.age ? `${p.age} anos` : null, p.minutes ? `${p.minutes} minutos` : null]
+            {[
+              p.club,
+              p.age ? `${p.age} anos` : null,
+              ...(profile
+                ? ([
+                    ["Pé", profile.id_map.foot],
+                    ["Nacionalidade", profile.id_map.nationality],
+                    ["Altura", profile.id_map.height],
+                    ["Salário", profile.id_map.salary],
+                    ["Nota média", profile.id_map.rating],
+                    ["Jogos completos", profile.id_map.fullGames],
+                  ] as const)
+                    .filter(([, col]) => !!col && p.data[col] !== undefined && p.data[col] !== "")
+                    .map(([label, col]) => `${label}: ${formatValue(p.data[col])}`)
+                : []),
+            ]
               .filter(Boolean)
               .join("  ·  ") || "Sem dados de identificação"}
           </p>
@@ -214,7 +229,7 @@ function PlayerSheet() {
                       )}
                     </p>
                     <p className="shrink-0 text-sm font-semibold">
-                      {r.value === null ? "—" : r.value}
+                      {r.value === null ? "—" : formatValue(r.value)}
                     </p>
                   </div>
                   <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-secondary">
@@ -243,7 +258,7 @@ function PlayerSheet() {
             {allEntries.map(([key, value]) => (
               <div key={key} className="flex justify-between gap-3 border-b border-border/40 py-1">
                 <span className="truncate text-muted-foreground">{key}</span>
-                <span className="shrink-0 font-medium">{String(value ?? "—") || "—"}</span>
+                <span className="shrink-0 font-medium">{formatValue(value)}</span>
               </div>
             ))}
           </div>

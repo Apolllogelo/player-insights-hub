@@ -8,8 +8,12 @@ export type IdMap = {
   name: string;
   club: string;
   age: string;
-  position: string;
-  minutes: string;
+  foot: string;
+  nationality: string;
+  height: string;
+  salary: string;
+  rating: string;
+  fullGames: string;
 };
 
 export type PositionProfile = {
@@ -47,9 +51,25 @@ export const emptyIdMap: IdMap = {
   name: "",
   club: "",
   age: "",
-  position: "",
-  minutes: "",
+  foot: "",
+  nationality: "",
+  height: "",
+  salary: "",
+  rating: "",
+  fullGames: "",
 };
+
+/** Números em pt-BR: inteiros ficam inteiros, o resto ganha pelo menos duas casas (0,00). */
+export function formatValue(value: unknown): string {
+  const n = toNumber(value);
+  if (n === null) {
+    const s = String(value ?? "").trim();
+    return s === "" ? "—" : s;
+  }
+  return Number.isInteger(n)
+    ? n.toLocaleString("pt-BR")
+    : n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
 
 export const METRIC_SLOTS = 14;
 

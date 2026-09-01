@@ -1,6 +1,8 @@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Search } from "lucide-react";
+import { useMemo, useState } from "react";
 import { METRIC_SLOTS, type IdMap, type Metric } from "@/lib/scout-types";
 
 type Props = {
@@ -15,8 +17,12 @@ const ID_FIELDS: { key: keyof IdMap; label: string; required?: boolean }[] = [
   { key: "name", label: "Nome do jogador", required: true },
   { key: "club", label: "Clube" },
   { key: "age", label: "Idade" },
-  { key: "position", label: "Posição" },
-  { key: "minutes", label: "Minutos jogados" },
+  { key: "foot", label: "Pé preferido" },
+  { key: "nationality", label: "Nacionalidade" },
+  { key: "height", label: "Altura" },
+  { key: "salary", label: "Salário" },
+  { key: "rating", label: "Nota média" },
+  { key: "fullGames", label: "Jogos completos" },
 ];
 
 function ColumnSelect({
@@ -57,6 +63,13 @@ export function MappingFields({
     metrics[i] ?? { column: "", label: "", invert: false },
   );
 
+  const [metricSearch, setMetricSearch] = useState("");
+  const metricColumns = useMemo(() => {
+    const term = metricSearch.trim().toLowerCase();
+    if (!term) return columns;
+    return columns.filter((c) => c.toLowerCase().includes(term));
+  }, [columns, metricSearch]);
+
   const updateSlot = (index: number, patch: Partial<Metric>) => {
     const next = slots.map((slot, i) => (i === index ? { ...slot, ...patch } : slot));
     onMetricsChange(next);
@@ -94,6 +107,20 @@ export function MappingFields({
           Escolha a coluna, dê um nome curto e marque &quot;menor é melhor&quot; quando o valor baixo
           for o bom (ex: perdas de bola).
         </p>
+        <div className="relative mt-3 sm:max-w-xs">
+          <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            value={metricSearch}
+            onChange={(e) => setMetricSearch(e.target.value)}
+            placeholder="Pesquisar avaliação pelo nome da coluna"
+            className="bg-secondary pl-8"
+          />
+        </div>
+        {metricSearch && (
+          <p className="mt-1.5 text-xs text-muted-foreground">
+            {metricColumns.length} coluna(s) encontrada(s) — as listas abaixo estão filtradas.
+          </p>
+        )}
         <div className="mt-3 space-y-2">
           {slots.map((slot, i) => (
             <div
@@ -104,7 +131,11 @@ export function MappingFields({
                 {i + 1}
               </span>
               <ColumnSelect
-                columns={columns}
+                columns={
+                  slot.column && !metricColumns.includes(slot.column)
+                    ? [slot.column, ...metricColumns]
+                    : metricColumns
+                }
                 value={slot.column}
                 placeholder="— coluna da planilha —"
                 onChange={(v) => updateSlot(i, { column: v, label: slot.label || v })}

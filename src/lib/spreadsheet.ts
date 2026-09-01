@@ -28,7 +28,10 @@ function buildSheet(name: string, matrix: unknown[][]): ParsedSheet {
   );
   if (headerIndex === -1) return { name, columns: [], rows: [] };
 
-  const columns = normalizeHeaders(matrix[headerIndex] ?? []);
+  let columns = normalizeHeaders(matrix[headerIndex] ?? []);
+  // Tudo depois da coluna "Inf" só existe para as fórmulas da planilha — descartamos.
+  const infIndex = columns.findIndex((c) => /^inf\b/i.test(c.trim()));
+  if (infIndex !== -1) columns = columns.slice(0, infIndex);
   const rows: Record<string, unknown>[] = [];
   for (const line of matrix.slice(headerIndex + 1)) {
     if (!line.some((c) => c !== null && c !== undefined && String(c).trim() !== "")) continue;

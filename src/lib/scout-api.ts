@@ -124,8 +124,8 @@ export async function importDataset(input: {
     name: String(row[input.id_map.name] ?? "Sem nome"),
     club: input.id_map.club ? String(row[input.id_map.club] ?? "") || null : null,
     age: input.id_map.age ? toNumber(row[input.id_map.age]) : null,
-    position: input.id_map.position ? String(row[input.id_map.position] ?? "") || null : null,
-    minutes: input.id_map.minutes ? toNumber(row[input.id_map.minutes]) : null,
+    position: null,
+    minutes: null,
     data: row as never,
   }));
 
