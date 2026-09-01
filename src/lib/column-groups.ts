@@ -1,3 +1,5 @@
+import { formatValue } from "./scout-types";
+
 /** Agrupa as colunas originais da planilha em blocos temáticos inteligentes para scouting no futebol. */
 
 export type GroupDef = {
@@ -84,9 +86,62 @@ export type ColumnGroup = {
 
 export type GroupingMode = "categories" | "alphabetical" | "with_values";
 
+export type ColumnUnit =
+  | "none"
+  | "percent"
+  | "minutes"
+  | "years"
+  | "cm"
+  | "currency"
+  | "per90"
+  | "matches"
+  | "goals"
+  | "passes";
+
+export const UNIT_OPTIONS: { id: ColumnUnit; label: string; suffix: string; prefix?: string }[] = [
+  { id: "none", label: "Padrão (sem unidade)", suffix: "" },
+  { id: "percent", label: "Porcentagem (%)", suffix: "%" },
+  { id: "minutes", label: "Minutos (min)", suffix: " min" },
+  { id: "years", label: "Idade / Anos", suffix: " anos" },
+  { id: "cm", label: "Altura (cm)", suffix: " cm" },
+  { id: "currency", label: "Moeda (R$)", suffix: "", prefix: "R$ " },
+  { id: "per90", label: "Por 90 min (/90)", suffix: " /90" },
+  { id: "matches", label: "Jogos / Partidas", suffix: " jogos" },
+  { id: "goals", label: "Gols", suffix: " gols" },
+  { id: "passes", label: "Passes", suffix: " passes" },
+];
+
+export function autoDetectUnit(columnName: string): ColumnUnit {
+  const c = columnName.toLowerCase();
+  if (/%|taxa|aproveit|precis[aã]o|acerto|pct|convers/i.test(c)) return "percent";
+  if (/minuto|tempo.*jogado|min/i.test(c)) return "minutes";
+  if (/idade|age|nascim/i.test(c)) return "years";
+  if (/altura|height/i.test(c)) return "cm";
+  if (/sal[aá]rio|salary|wage|valor|pre[cç]o|cl[aá]usula/i.test(c)) return "currency";
+  if (/\/90|por.*90|per.*90/i.test(c)) return "per90";
+  if (/jogo.*completo|partida|match|app/i.test(c)) return "matches";
+  if (/gol|goal/i.test(c)) return "goals";
+  return "none";
+}
+
+export function formatColumnValue(value: unknown, unit: ColumnUnit = "none"): string {
+  const formatted = formatValue(value);
+  if (formatted === "—" || formatted === "") return "—";
+
+  const opt = UNIT_OPTIONS.find((u) => u.id === unit);
+  if (!opt || unit === "none") return formatted;
+
+  if (opt.prefix) {
+    return `${opt.prefix}${formatted}${opt.suffix}`;
+  }
+  return `${formatted}${opt.suffix}`;
+}
+
 export function groupEntries(
   entries: [string, unknown][],
   mode: GroupingMode = "categories",
+  customGroupMap?: Record<string, string>,
+  customItemOrder?: Record<string, string[]>,
 ): ColumnGroup[] {
   if (mode === "alphabetical") {
     const sorted = [...entries].sort((a, b) => a[0].localeCompare(b[0], "pt-BR"));
@@ -122,15 +177,40 @@ export function groupEntries(
   };
 
   for (const entry of entries) {
-    const group = SCOUT_GROUPS.find((g) => g.test.test(entry[0]));
-    push(group?.id ?? "others", entry);
+    const colName = entry[0];
+    // Se o usuário moveu manualmente esta coluna para outro grupo, respeita a escolha
+    const customGroupId = customGroupMap?.[colName];
+    if (customGroupId) {
+      push(customGroupId, entry);
+    } else {
+      const group = SCOUT_GROUPS.find((g) => g.test.test(colName));
+      push(group?.id ?? "others", entry);
+    }
   }
 
   const result: ColumnGroup[] = [];
 
   for (const g of SCOUT_GROUPS) {
-    const items = buckets.get(g.id);
+    let items = buckets.get(g.id);
     if (items && items.length > 0) {
+      // Se houver ordenação customizada dentro do grupo, reordena
+      const order = customItemOrder?.[g.id];
+      if (order && order.length > 0) {
+        const itemMap = new Map(items.map((it) => [it[0], it]));
+        const orderedItems: [string, unknown][] = [];
+        for (const colName of order) {
+          if (itemMap.has(colName)) {
+            orderedItems.push(itemMap.get(colName)!);
+            itemMap.delete(colName);
+          }
+        }
+        // Itens que não estavam na ordem salva vão ao final
+        for (const it of itemMap.values()) {
+          orderedItems.push(it);
+        }
+        items = orderedItems;
+      }
+
       result.push({
         id: g.id,
         name: g.name,
@@ -141,8 +221,24 @@ export function groupEntries(
     }
   }
 
-  const otherItems = buckets.get("others");
+  let otherItems = buckets.get("others");
   if (otherItems && otherItems.length > 0) {
+    const order = customItemOrder?.["others"];
+    if (order && order.length > 0) {
+      const itemMap = new Map(otherItems.map((it) => [it[0], it]));
+      const orderedItems: [string, unknown][] = [];
+      for (const colName of order) {
+        if (itemMap.has(colName)) {
+          orderedItems.push(itemMap.get(colName)!);
+          itemMap.delete(colName);
+        }
+      }
+      for (const it of itemMap.values()) {
+        orderedItems.push(it);
+      }
+      otherItems = orderedItems;
+    }
+
     result.push({
       id: "others",
       name: "Outros Dados e Métricas",
@@ -154,3 +250,4 @@ export function groupEntries(
 
   return result;
 }
+
