@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Upload, Trash2, Search, ChevronRight } from "lucide-react";
+import { Upload, Trash2, Search, ChevronRight, RotateCcw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +16,7 @@ import {
   importDataset,
   playersQuery,
   profilesQuery,
+  resetPlayers,
 } from "@/lib/scout-api";
 import { emptyIdMap, type IdMap, type Metric } from "@/lib/scout-types";
 
@@ -59,6 +60,7 @@ function Home() {
   const [idMap, setIdMap] = useState<IdMap>(emptyIdMap);
   const [metrics, setMetrics] = useState<Metric[]>([]);
   const [importing, setImporting] = useState(false);
+  const [resetting, setResetting] = useState(false);
 
   const sheet: ParsedSheet | null = workbook?.sheets[sheetIndex] ?? null;
 
@@ -175,6 +177,22 @@ function Home() {
     }
   }
 
+  async function handleReset() {
+    if (!window.confirm("Apagar todos os jogadores e planilhas importadas? Os perfis de posição continuam salvos.")) {
+      return;
+    }
+    setResetting(true);
+    try {
+      await resetPlayers();
+      await queryClient.invalidateQueries();
+      toast.success("Jogadores resetados.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Não consegui resetar.");
+    } finally {
+      setResetting(false);
+    }
+  }
+
   async function handleDelete(id: string) {
     try {
       await deleteDataset(id);
@@ -288,9 +306,15 @@ function Home() {
 
       {!!(datasets.data ?? []).length && (
         <section className="mt-10">
-          <h2 className="font-display text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-            Planilhas importadas
-          </h2>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="font-display text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+              Planilhas importadas
+            </h2>
+            <Button variant="ghost" size="sm" onClick={() => void handleReset()} disabled={resetting}>
+              <RotateCcw className="mr-2 h-4 w-4" />
+              {resetting ? "Resetando…" : "Resetar jogadores"}
+            </Button>
+          </div>
           <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {(datasets.data ?? []).map((d) => (
               <div
