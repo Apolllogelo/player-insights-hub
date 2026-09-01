@@ -276,6 +276,33 @@ function PlayerSheet() {
               ))}
             </div>
           </section>
+
+          {!!idRows.length && (
+            <section className="mt-8">
+              <h2 className="font-display text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                Perfil comparado ao grupo
+              </h2>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {idRows.map((r) => (
+                  <div key={r.key} className="rounded-lg border border-border/70 bg-surface p-3">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <p className="truncate text-sm">
+                        {r.label}
+                        {r.invert && (
+                          <span className="ml-1 text-xs text-muted-foreground">(menor é melhor)</span>
+                        )}
+                      </p>
+                      <p className="shrink-0 text-sm font-semibold">{formatValue(r.value)}</p>
+                    </div>
+                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-secondary">
+                      <div className="h-full rounded-full bg-primary" style={{ width: `${r.pct}%` }} />
+                    </div>
+                    <p className={`mt-1 text-xs ${scoreColor(r.pct)}`}>percentil {r.pct}</p>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
         </>
       )}
 
@@ -285,13 +312,39 @@ function PlayerSheet() {
           Dados completos ({allEntries.length} colunas)
         </Button>
         {showAll && (
-          <div className="mt-3 grid gap-x-6 gap-y-1 rounded-xl border border-border/70 bg-card p-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
-            {allEntries.map(([key, value]) => (
-              <div key={key} className="flex justify-between gap-3 border-b border-border/40 py-1">
-                <span className="truncate text-muted-foreground">{key}</span>
-                <span className="shrink-0 font-medium">{formatValue(value)}</span>
-              </div>
-            ))}
+          <div className="mt-3 space-y-4">
+            <div className="relative sm:max-w-xs">
+              <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                value={dataSearch}
+                onChange={(e) => setDataSearch(e.target.value)}
+                placeholder="Buscar coluna"
+                className="bg-secondary pl-8"
+              />
+            </div>
+            {groups.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Nenhuma coluna com esse nome.</p>
+            ) : (
+              groups.map((g) => (
+                <div key={g.name} className="rounded-xl border border-border/70 bg-card p-4">
+                  <h3 className="font-display text-xs font-semibold uppercase tracking-wide text-primary">
+                    {g.name}{" "}
+                    <span className="text-muted-foreground">({g.items.length})</span>
+                  </h3>
+                  <div className="mt-2 grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2 lg:grid-cols-3">
+                    {g.items.map(([key, value]) => (
+                      <div
+                        key={key}
+                        className="flex justify-between gap-3 border-b border-border/40 py-1"
+                      >
+                        <span className="truncate text-muted-foreground">{key}</span>
+                        <span className="shrink-0 font-medium">{formatValue(value)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         )}
       </section>
