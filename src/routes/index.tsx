@@ -175,6 +175,22 @@ function Home() {
     }
   }
 
+  async function handleReset() {
+    if (!window.confirm("Apagar todos os jogadores e planilhas importadas? Os perfis de posição continuam salvos.")) {
+      return;
+    }
+    setResetting(true);
+    try {
+      await resetPlayers();
+      await queryClient.invalidateQueries();
+      toast.success("Jogadores resetados.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Não consegui resetar.");
+    } finally {
+      setResetting(false);
+    }
+  }
+
   async function handleDelete(id: string) {
     try {
       await deleteDataset(id);
