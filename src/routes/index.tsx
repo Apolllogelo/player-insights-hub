@@ -125,13 +125,12 @@ function Home() {
     );
     if (profile && target) {
       const known = new Set(target.columns);
-      setIdMap({
-        name: known.has(profile.id_map.name) ? profile.id_map.name : "",
-        club: known.has(profile.id_map.club) ? profile.id_map.club : "",
-        age: known.has(profile.id_map.age) ? profile.id_map.age : "",
-        position: known.has(profile.id_map.position) ? profile.id_map.position : "",
-        minutes: known.has(profile.id_map.minutes) ? profile.id_map.minutes : "",
-      });
+      const saved = { ...emptyIdMap, ...profile.id_map };
+      setIdMap(
+        Object.fromEntries(
+          Object.entries(saved).map(([k, v]) => [k, known.has(String(v)) ? v : ""]),
+        ) as IdMap,
+      );
       setMetrics(profile.metrics.filter((m) => known.has(m.column)));
     } else if (target) {
       setIdMap((prev) => (target.columns.includes(prev.name) ? prev : emptyIdMap));
