@@ -251,34 +251,32 @@ export function PlayerSheet() {
       .filter((r): r is NonNullable<typeof r> => r !== null);
   }, [player.data, profile, peers.data]);
 
-  const radarData = rows
-    .filter((r) => r.pct !== null)
-    .map((r) => ({ label: r.metric.label, pct: r.pct as number }));
+  const radarData = useMemo(
+    () =>
+      rows
+        .filter((r) => r.pct !== null)
+        .map((r) => ({ label: r.metric.label, pct: r.pct as number })),
+    [rows],
+  );
 
-  const strengths = rows.filter((r) => (r.pct ?? 0) >= 70).sort((a, b) => (b.pct ?? 0) - (a.pct ?? 0));
-  const warnings = rows
-    .filter((r) => r.pct !== null && (r.pct as number) <= 30)
-    .sort((a, b) => (a.pct ?? 0) - (b.pct ?? 0));
+  const strengths = useMemo(
+    () => rows.filter((r) => (r.pct ?? 0) >= 70).sort((a, b) => (b.pct ?? 0) - (a.pct ?? 0)),
+    [rows],
+  );
 
-  if (player.isLoading) {
-    return <main className="mx-auto max-w-5xl px-4 py-16 text-sm text-muted-foreground">Carregando…</main>;
-  }
+  const warnings = useMemo(
+    () =>
+      rows
+        .filter((r) => r.pct !== null && (r.pct as number) <= 30)
+        .sort((a, b) => (a.pct ?? 0) - (b.pct ?? 0)),
+    [rows],
+  );
 
-  if (!player.data) {
-    return (
-      <main className="mx-auto max-w-5xl px-4 py-16">
-        <p className="text-sm text-muted-foreground">Jogador não encontrado.</p>
-        <Link to="/" className="mt-4 inline-block text-sm text-primary">
-          Voltar
-        </Link>
-      </main>
-    );
-  }
+  const allEntries = useMemo(() => {
+    return Object.entries(player.data?.data ?? {});
+  }, [player.data]);
 
-  const p = player.data;
-  const allEntries = Object.entries(p.data);
-
-  // Filtro e agrupamento dos dados completos
+  // Filtro e agrupamento dos dados completos (chamado antes dos early returns)
   const computedGroups = useMemo(() => {
     const term = dataSearch.trim().toLowerCase();
     const filtered = term
@@ -316,6 +314,23 @@ export function PlayerSheet() {
     });
     setCollapsedGroups(allCollapsed);
   };
+
+  if (player.isLoading) {
+    return <main className="mx-auto max-w-5xl px-4 py-16 text-sm text-muted-foreground">Carregando…</main>;
+  }
+
+  if (!player.data) {
+    return (
+      <main className="mx-auto max-w-5xl px-4 py-16">
+        <p className="text-sm text-muted-foreground">Jogador não encontrado.</p>
+        <Link to="/" className="mt-4 inline-block text-sm text-primary">
+          Voltar
+        </Link>
+      </main>
+    );
+  }
+
+  const p = player.data;
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-8">
