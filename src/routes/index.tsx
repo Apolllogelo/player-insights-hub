@@ -76,9 +76,7 @@ function Home() {
       if (typeFilter && p.player_type !== typeFilter) return false;
       if (!term) return true;
       return (
-        p.name.toLowerCase().includes(term) ||
-        (p.club ?? "").toLowerCase().includes(term) ||
-        (p.position ?? "").toLowerCase().includes(term)
+        p.name.toLowerCase().includes(term) || (p.club ?? "").toLowerCase().includes(term)
       );
     });
   }, [players.data, search, typeFilter]);
@@ -326,7 +324,7 @@ function Home() {
               <Input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Buscar nome, clube, posição"
+                placeholder="Buscar nome ou clube"
                 className="w-64 bg-secondary pl-8"
               />
             </div>
@@ -363,9 +361,7 @@ function Home() {
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium">{p.name}</p>
                   <p className="truncate text-xs text-muted-foreground">
-                    {[p.club, p.position, p.age ? `${p.age} anos` : null, p.minutes ? `${p.minutes} min` : null]
-                      .filter(Boolean)
-                      .join(" · ") || "—"}
+                    {[p.club, p.age ? `${p.age} anos` : null].filter(Boolean).join(" · ") || "—"}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
