@@ -288,9 +288,15 @@ function Home() {
 
       {!!(datasets.data ?? []).length && (
         <section className="mt-10">
-          <h2 className="font-display text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-            Planilhas importadas
-          </h2>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="font-display text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+              Planilhas importadas
+            </h2>
+            <Button variant="ghost" size="sm" onClick={() => void handleReset()} disabled={resetting}>
+              <RotateCcw className="mr-2 h-4 w-4" />
+              {resetting ? "Resetando…" : "Resetar jogadores"}
+            </Button>
+          </div>
           <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {(datasets.data ?? []).map((d) => (
               <div
