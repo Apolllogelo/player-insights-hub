@@ -60,6 +60,7 @@ function Home() {
   const [idMap, setIdMap] = useState<IdMap>(emptyIdMap);
   const [metrics, setMetrics] = useState<Metric[]>([]);
   const [importing, setImporting] = useState(false);
+  const [resetting, setResetting] = useState(false);
 
   const sheet: ParsedSheet | null = workbook?.sheets[sheetIndex] ?? null;
 
