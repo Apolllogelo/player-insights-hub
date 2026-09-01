@@ -77,6 +77,37 @@ function PlayerSheet() {
     });
   }, [player.data, profile, peers.data]);
 
+  /** Comparativo dos dados de identificação numéricos (idade, altura, salário, nota, jogos). */
+  const idRows = useMemo(() => {
+    if (!player.data || !profile) return [];
+    const group = peers.data ?? [];
+    const fields = [
+      { key: "age", label: "Idade", invert: true },
+      { key: "height", label: "Altura", invert: false },
+      { key: "salary", label: "Salário", invert: true },
+      { key: "rating", label: "Nota média", invert: false },
+      { key: "fullGames", label: "Jogos completos", invert: false },
+    ] as const;
+    return fields
+      .map((f) => {
+        const column = profile.id_map[f.key];
+        if (!column) return null;
+        const value = toNumber(player.data!.data[column]);
+        if (value === null) return null;
+        const values = group
+          .map((p) => toNumber(p.data[column]))
+          .filter((v): v is number => v !== null);
+        return {
+          key: f.key,
+          label: f.label,
+          invert: f.invert,
+          value,
+          pct: percentile(values, value, f.invert),
+        };
+      })
+      .filter((r): r is NonNullable<typeof r> => r !== null);
+  }, [player.data, profile, peers.data]);
+
   const radarData = rows
     .filter((r) => r.pct !== null)
     .map((r) => ({ label: r.metric.label, pct: r.pct as number }));
