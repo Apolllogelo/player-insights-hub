@@ -16,6 +16,7 @@ import {
   importDataset,
   playersQuery,
   profilesQuery,
+  resetPlayers,
 } from "@/lib/scout-api";
 import { emptyIdMap, type IdMap, type Metric } from "@/lib/scout-types";
 
