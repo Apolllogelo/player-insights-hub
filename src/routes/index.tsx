@@ -2,12 +2,31 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Upload, Trash2, Search, ChevronRight, RotateCcw } from "lucide-react";
+import {
+  Upload,
+  Trash2,
+  Search,
+  ChevronRight,
+  RotateCcw,
+  SlidersHorizontal,
+  FileSpreadsheet,
+  AlertTriangle,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { MappingFields } from "@/components/mapping-fields";
 import { parseSpreadsheet, type ParsedSheet, type ParsedWorkbook } from "@/lib/spreadsheet";
 import {
@@ -18,7 +37,7 @@ import {
   profilesQuery,
   resetPlayers,
 } from "@/lib/scout-api";
-import { emptyIdMap, type IdMap, type Metric } from "@/lib/scout-types";
+import { emptyIdMap, formatValue, type IdMap, type Metric } from "@/lib/scout-types";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -27,13 +46,13 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "Suba suas planilhas de scouting, mapeie as 14 avaliações de cada tipo de jogador e navegue por fichas individuais com percentis, destaques e alertas.",
+          "Suba suas planilhas de scouting, mapeie as avaliações de cada tipo de jogador e navegue por fichas individuais com percentis, comparativo físico e alertas.",
       },
       { property: "og:title", content: "Scout Board — planilhas de scouting em fichas claras" },
       {
         property: "og:description",
         content:
-          "De 100+ colunas para uma ficha individual limpa: percentis por posição, destaques e pontos de atenção automáticos.",
+          "De 100+ colunas para uma ficha individual limpa: percentis por posição, comparativo de identificação e pontos de atenção automáticos.",
       },
     ],
   }),
@@ -62,10 +81,15 @@ function Home() {
   const [importing, setImporting] = useState(false);
   const [resetting, setResetting] = useState(false);
 
+  // Modais de confirmação
+  const [resetDialogOpen, setResetDialogOpen] = useState(false);
+  const [deleteDatasetId, setDeleteDatasetId] = useState<string | null>(null);
+
   const sheet: ParsedSheet | null = workbook?.sheets[sheetIndex] ?? null;
 
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
+  const [sortBy, setSortBy] = useState<"name_asc" | "name_desc" | "age_asc" | "age_desc">("name_asc");
 
   const playerTypes = useMemo(
     () => Array.from(new Set((datasets.data ?? []).map((d) => d.player_type))).sort(),
@@ -74,14 +98,21 @@ function Home() {
 
   const filteredPlayers = useMemo(() => {
     const term = search.trim().toLowerCase();
-    return (players.data ?? []).filter((p) => {
+    const list = (players.data ?? []).filter((p) => {
       if (typeFilter && p.player_type !== typeFilter) return false;
       if (!term) return true;
       return (
         p.name.toLowerCase().includes(term) || (p.club ?? "").toLowerCase().includes(term)
       );
     });
-  }, [players.data, search, typeFilter]);
+
+    return list.sort((a, b) => {
+      if (sortBy === "name_desc") return b.name.localeCompare(a.name, "pt-BR");
+      if (sortBy === "age_asc") return (a.age ?? 999) - (b.age ?? 999);
+      if (sortBy === "age_desc") return (b.age ?? 0) - (a.age ?? 0);
+      return a.name.localeCompare(b.name, "pt-BR");
+    });
+  }, [players.data, search, typeFilter, sortBy]);
 
   async function handleFile(file: File) {
     try {
@@ -169,7 +200,7 @@ function Home() {
       setWorkbook(null);
       setFileName("");
       if (fileRef.current) fileRef.current.value = "";
-      toast.success("Planilha importada.");
+      toast.success("Planilha importada com sucesso!");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Falha ao importar.");
     } finally {
@@ -177,15 +208,13 @@ function Home() {
     }
   }
 
-  async function handleReset() {
-    if (!window.confirm("Apagar todos os jogadores e planilhas importadas? Os perfis de posição continuam salvos.")) {
-      return;
-    }
+  async function handleConfirmReset() {
     setResetting(true);
     try {
       await resetPlayers();
       await queryClient.invalidateQueries();
-      toast.success("Jogadores resetados.");
+      setResetDialogOpen(false);
+      toast.success("Todos os jogadores e planilhas foram resetados.");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Não consegui resetar.");
     } finally {
@@ -193,26 +222,47 @@ function Home() {
     }
   }
 
-  async function handleDelete(id: string) {
+  async function handleConfirmDeleteDataset() {
+    if (!deleteDatasetId) return;
     try {
-      await deleteDataset(id);
+      await deleteDataset(deleteDatasetId);
       await queryClient.invalidateQueries();
+      setDeleteDatasetId(null);
       toast.success("Planilha removida.");
     } catch {
-      toast.error("Não consegui remover.");
+      toast.error("Não consegui remover a planilha.");
     }
   }
 
+  const hasAnyData = (datasets.data ?? []).length > 0 || (players.data ?? []).length > 0;
+
   return (
     <main className="mx-auto max-w-6xl px-4 py-10">
-      <h1 className="max-w-2xl text-3xl font-semibold sm:text-4xl">
-        Suas planilhas de scouting, em fichas que cabem numa tela
-      </h1>
-      <p className="mt-3 max-w-2xl text-sm text-muted-foreground">
-        Suba o CSV ou Excel, aponte uma vez quais são as 14 avaliações daquele tipo de jogador e o
-        resto do trabalho — percentis, destaques e alertas — fica pronto.
-      </p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="max-w-2xl text-3xl font-semibold sm:text-4xl">
+            Suas planilhas de scouting, em fichas que cabem numa tela
+          </h1>
+          <p className="mt-3 max-w-2xl text-sm text-muted-foreground">
+            Suba o CSV ou Excel, configure as 14 avaliações por posição e visualize percentis, destaques,
+            comparativo físico/cadastral e dados reorganizados por blocos temáticos.
+          </p>
+        </div>
 
+        {hasAnyData && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setResetDialogOpen(true)}
+            className="border-destructive/30 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
+          >
+            <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
+            Resetar Base de Jogadores
+          </Button>
+        )}
+      </div>
+
+      {/* Upload de Planilha */}
       <section className="mt-8 rounded-xl border border-border/70 bg-card p-5">
         <div className="flex flex-wrap items-center gap-3">
           <input
@@ -304,22 +354,29 @@ function Home() {
         )}
       </section>
 
+      {/* Seção de Planilhas Importadas */}
       {!!(datasets.data ?? []).length && (
         <section className="mt-10">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="font-display text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-              Planilhas importadas
+              Planilhas importadas ({(datasets.data ?? []).length})
             </h2>
-            <Button variant="ghost" size="sm" onClick={() => void handleReset()} disabled={resetting}>
-              <RotateCcw className="mr-2 h-4 w-4" />
-              {resetting ? "Resetando…" : "Resetar jogadores"}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setResetDialogOpen(true)}
+              className="text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
+              disabled={resetting}
+            >
+              <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
+              {resetting ? "Resetando…" : "Resetar todas as planilhas"}
             </Button>
           </div>
           <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {(datasets.data ?? []).map((d) => (
               <div
                 key={d.id}
-                className="flex items-center justify-between gap-2 rounded-lg border border-border/70 bg-surface p-3"
+                className="flex items-center justify-between gap-2 rounded-lg border border-border/70 bg-surface p-3 transition-colors hover:border-border"
               >
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium">{d.name}</p>
@@ -327,8 +384,14 @@ function Home() {
                     {d.player_type} · {d.row_count} jogadores · {d.columns.length} colunas
                   </p>
                 </div>
-                <Button variant="ghost" size="icon" onClick={() => void handleDelete(d.id)}>
-                  <Trash2 className="h-4 w-4 text-muted-foreground" />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive"
+                  onClick={() => setDeleteDatasetId(d.id)}
+                  title="Excluir planilha"
+                >
+                  <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
                 </Button>
               </div>
             ))}
@@ -336,11 +399,18 @@ function Home() {
         </section>
       )}
 
+      {/* Seção de Jogadores */}
       <section className="mt-10">
         <div className="flex flex-wrap items-end justify-between gap-3">
-          <h2 className="font-display text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-            Jogadores ({filteredPlayers.length})
-          </h2>
+          <div>
+            <h2 className="font-display text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+              Jogadores Cadastrados ({filteredPlayers.length})
+            </h2>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Clique em um jogador para ver a ficha completa com percentis e comparativo
+            </p>
+          </div>
+
           <div className="flex flex-wrap items-center gap-2">
             <div className="relative">
               <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -348,13 +418,13 @@ function Home() {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Buscar nome ou clube"
-                className="w-64 bg-secondary pl-8"
+                className="w-56 bg-secondary pl-8 text-sm"
               />
             </div>
             <select
               value={typeFilter}
               onChange={(e) => setTypeFilter(e.target.value)}
-              className="h-9 rounded-md border border-input bg-secondary px-2 text-sm"
+              className="h-9 rounded-md border border-input bg-secondary px-2.5 text-xs"
             >
               <option value="">Todos os tipos</option>
               {playerTypes.map((t) => (
@@ -363,41 +433,119 @@ function Home() {
                 </option>
               ))}
             </select>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+              className="h-9 rounded-md border border-input bg-secondary px-2.5 text-xs"
+            >
+              <option value="name_asc">Nome (A-Z)</option>
+              <option value="name_desc">Nome (Z-A)</option>
+              <option value="age_asc">Mais jovem primeiro</option>
+              <option value="age_desc">Mais experiente primeiro</option>
+            </select>
           </div>
         </div>
 
         {players.isLoading ? (
-          <p className="mt-6 text-sm text-muted-foreground">Carregando…</p>
+          <p className="mt-6 text-sm text-muted-foreground">Carregando jogadores…</p>
         ) : filteredPlayers.length === 0 ? (
-          <p className="mt-6 text-sm text-muted-foreground">
-            Nenhum jogador ainda. Importe uma planilha acima.
-          </p>
+          <div className="mt-6 rounded-xl border border-dashed border-border/80 p-8 text-center">
+            <FileSpreadsheet className="mx-auto h-8 w-8 text-muted-foreground/60" />
+            <p className="mt-2 text-sm text-muted-foreground">
+              Nenhum jogador encontrado. Importe uma planilha no topo para começar.
+            </p>
+          </div>
         ) : (
-          <div className="mt-3 divide-y divide-border/60 overflow-hidden rounded-xl border border-border/70 bg-card">
-            {filteredPlayers.slice(0, 300).map((p) => (
-              <Link
-                key={p.id}
-                to="/jogador/$id"
-                params={{ id: p.id }}
-                className="flex items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-secondary/60"
-              >
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium">{p.name}</p>
-                  <p className="truncate text-xs text-muted-foreground">
-                    {[p.club, p.age ? `${p.age} anos` : null].filter(Boolean).join(" · ") || "—"}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant="secondary" className="shrink-0">
-                    {p.player_type}
-                  </Badge>
-                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                </div>
-              </Link>
-            ))}
+          <div className="mt-4 divide-y divide-border/60 overflow-hidden rounded-xl border border-border/70 bg-card">
+            {filteredPlayers.slice(0, 300).map((p) => {
+              // Informações extras dos dados se existirem
+              const profile = (profiles.data ?? []).find((pr) => pr.player_type === p.player_type);
+              const heightVal = profile?.id_map?.height ? p.data[profile.id_map.height] : undefined;
+              const ratingVal = profile?.id_map?.rating ? p.data[profile.id_map.rating] : undefined;
+
+              return (
+                <Link
+                  key={p.id}
+                  to="/jogador/$id"
+                  params={{ id: p.id }}
+                  className="flex items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-secondary/60"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="truncate text-sm font-medium text-foreground">{p.name}</p>
+                      <Badge variant="outline" className="text-[10px] opacity-80">
+                        {p.player_type}
+                      </Badge>
+                    </div>
+                    <div className="mt-1 flex flex-wrap items-center gap-x-3 text-xs text-muted-foreground">
+                      <span>{p.club || "Sem clube"}</span>
+                      {p.age && <span>{p.age} anos</span>}
+                      {heightVal !== undefined && <span>{formatValue(heightVal)} cm</span>}
+                      {ratingVal !== undefined && (
+                        <span className="font-medium text-primary">Nota: {formatValue(ratingVal)}</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                </Link>
+              );
+            })}
           </div>
         )}
       </section>
+
+      {/* Diálogo de Confirmação para Resetar Todos os Jogadores */}
+      <AlertDialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-5 w-5" />
+              Resetar todos os jogadores?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação apagará todos os jogadores e planilhas importadas da base. Seus perfis de posições
+              e mapeamentos de 14 avaliações <strong>continuarão salvos</strong> para próximas importações.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={resetting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => void handleConfirmReset()}
+              disabled={resetting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {resetting ? "Resetando…" : "Sim, resetar base"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Diálogo de Confirmação para Excluir Planilha Específica */}
+      <AlertDialog open={!!deleteDatasetId} onOpenChange={(open) => !open && setDeleteDatasetId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Trash2 className="h-5 w-5 text-destructive" />
+              Excluir esta planilha?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Os dados e os jogadores vinculados a esta planilha específica serão removidos.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => void handleConfirmDeleteDataset()}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Excluir planilha
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </main>
   );
 }
+
