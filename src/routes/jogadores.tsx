@@ -308,8 +308,10 @@ function JogadoresPage() {
                   </div>
                 </div>
               </div>
-              <Button className="w-full bg-white text-[#0F1015] hover:bg-gray-100">
-                Abrir ficha completa
+              <Button asChild className="w-full bg-white text-[#0F1015] hover:bg-gray-100">
+                <Link to="/jogador/$id" params={{ id: selectedPlayer?.id || "" }}>
+                  Abrir ficha completa
+                </Link>
               </Button>
             </div>
           </Card>

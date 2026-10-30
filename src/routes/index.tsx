@@ -383,9 +383,11 @@ function VisaoGeralPage() {
                   Bom posicionamento defensivo. Necessita evoluir na saída de bola sob pressão.
                 </p>
               </div>
-              <Button className="w-full bg-[#3458D4] hover:bg-[#2A4BC4]">
-                Abrir perfil completo
-                <ArrowUpRight className="ml-2 h-4 w-4" />
+              <Button asChild className="w-full bg-[#3458D4] hover:bg-[#2A4BC4]">
+                <Link to="/jogador/$id" params={{ id: selectedPlayer?.id || "" }}>
+                  Abrir perfil completo
+                  <ArrowUpRight className="ml-2 h-4 w-4" />
+                </Link>
               </Button>
             </div>
           </Card>
