@@ -350,8 +350,8 @@ function VisaoGeralPage() {
               </div>
             </div>
             <div className="p-5">
-              <div className="mb-5 h-[200px]">
-                <ResponsiveContainer width="100%" height="100%">
+              <div className="mb-5 h-[200px] w-full">
+                <ResponsiveContainer width="100%" height={200}>
                   <RadarChart data={radarData}>
                     <PolarGrid stroke="#E5E7EB" />
                     <PolarAngleAxis dataKey="subject" tick={{ fontSize: 10, fill: "#6B7280" }} />

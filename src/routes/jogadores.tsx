@@ -267,8 +267,8 @@ function JogadoresPage() {
                   <Bookmark className="h-4 w-4" />
                 </Button>
               </div>
-              <div className="mb-4 h-[160px]">
-                <ResponsiveContainer width="100%" height="100%">
+              <div className="mb-4 h-[160px] w-full">
+                <ResponsiveContainer width="100%" height={160}>
                   <RadarChart data={radarData}>
                     <PolarGrid stroke="#2A2F37" />
                     <PolarAngleAxis dataKey="subject" tick={{ fontSize: 9, fill: "#9CA3AF" }} />
