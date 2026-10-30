@@ -22,7 +22,7 @@ import { emptyIdMap, type IdMap, type Metric } from "@/lib/scout-types";
 export const Route = createFileRoute("/mapear")({
   head: () => ({
     meta: [
-      { title: "Perfis de posição — Scout Board" },
+      { title: "Scoutboard — Perfis de posição" },
       {
         name: "description",
         content:

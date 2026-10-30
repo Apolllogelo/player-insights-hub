@@ -43,7 +43,7 @@ import { emptyIdMap, formatValue, getPlayerUid, type IdMap, type Metric } from "
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Scout Board — planilhas de scouting em fichas claras" },
+      { title: "Scoutboard — Visão Geral" },
       {
         name: "description",
         content:

@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as MapearRouteImport } from './routes/mapear'
+import { Route as PlanejadorRouteImport } from './routes/planejador'
 import { Route as JogadorIdRouteImport } from './routes/jogador.$id'
 
 const IndexRoute = IndexRouteImport.update({
@@ -23,6 +24,11 @@ const MapearRoute = MapearRouteImport.update({
   path: '/mapear',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PlanejadorRoute = PlanejadorRouteImport.update({
+  id: '/planejador',
+  path: '/planejador',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const JogadorIdRoute = JogadorIdRouteImport.update({
   id: '/jogador/$id',
   path: '/jogador/$id',
@@ -32,30 +38,34 @@ const JogadorIdRoute = JogadorIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/mapear': typeof MapearRoute
+  '/planejador': typeof PlanejadorRoute
   '/jogador/$id': typeof JogadorIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/mapear': typeof MapearRoute
+  '/planejador': typeof PlanejadorRoute
   '/jogador/$id': typeof JogadorIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/mapear': typeof MapearRoute
+  '/planejador': typeof PlanejadorRoute
   '/jogador/$id': typeof JogadorIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/mapear' | '/jogador/$id'
+  fullPaths: '/' | '/mapear' | '/planejador' | '/jogador/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/mapear' | '/jogador/$id'
-  id: '__root__' | '/' | '/mapear' | '/jogador/$id'
+  to: '/' | '/mapear' | '/planejador' | '/jogador/$id'
+  id: '__root__' | '/' | '/mapear' | '/planejador' | '/jogador/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   MapearRoute: typeof MapearRoute
+  PlanejadorRoute: typeof PlanejadorRoute
   JogadorIdRoute: typeof JogadorIdRoute
 }
 
@@ -75,6 +85,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MapearRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/planejador': {
+      id: '/planejador'
+      path: '/planejador'
+      fullPath: '/planejador'
+      preLoaderRoute: typeof PlanejadorRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/jogador/$id': {
       id: '/jogador/$id'
       path: '/jogador/$id'
@@ -88,6 +105,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   MapearRoute: MapearRoute,
+  PlanejadorRoute: PlanejadorRoute,
   JogadorIdRoute: JogadorIdRoute,
 }
 export const routeTree = rootRouteImport

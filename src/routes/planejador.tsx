@@ -51,7 +51,7 @@ import { loadPlanejadorData } from "@/lib/planilha.server";
 export const Route = createFileRoute("/planejador")({
   head: () => ({
     meta: [
-      { title: "Planejador — Scout Board" },
+      { title: "Scoutboard — Planejador" },
       {
         name: "description",
         content:
