@@ -137,11 +137,21 @@ export function formatColumnValue(value: unknown, unit: ColumnUnit = "none"): st
   return `${formatted}${opt.suffix}`;
 }
 
+export type CustomCategoryDef = {
+  id: string;
+  name: string;
+  description?: string;
+  icon?: string;
+};
+
 export function groupEntries(
   entries: [string, unknown][],
   mode: GroupingMode = "categories",
   customGroupMap?: Record<string, string>,
   customItemOrder?: Record<string, string[]>,
+  customCategories: CustomCategoryDef[] = [],
+  groupRenames: Record<string, string> = {},
+  deletedGroupIds: string[] = [],
 ): ColumnGroup[] {
   if (mode === "alphabetical") {
     const sorted = [...entries].sort((a, b) => a[0].localeCompare(b[0], "pt-BR"));
@@ -176,26 +186,38 @@ export function groupEntries(
     buckets.set(groupId, list);
   };
 
+  const allAvailableGroups: { id: string; name: string; icon: string; description: string; test?: RegExp }[] = [
+    ...SCOUT_GROUPS.filter((g) => !deletedGroupIds.includes(g.id)),
+    ...customCategories.map((c) => ({
+      id: c.id,
+      name: c.name,
+      icon: c.icon || "Layers",
+      description: c.description || "Camada personalizada",
+    })),
+  ];
+
   for (const entry of entries) {
     const colName = entry[0];
-    // Se o usuário moveu manualmente esta coluna para outro grupo, respeita a escolha
+    // Se o usuário moveu manualmente esta coluna para outro grupo existente, respeita a escolha
     const customGroupId = customGroupMap?.[colName];
-    if (customGroupId) {
+    if (customGroupId && !deletedGroupIds.includes(customGroupId)) {
       push(customGroupId, entry);
     } else {
-      const group = SCOUT_GROUPS.find((g) => g.test.test(colName));
+      const group = SCOUT_GROUPS.find((g) => !deletedGroupIds.includes(g.id) && g.test.test(colName));
       push(group?.id ?? "others", entry);
     }
   }
 
   const result: ColumnGroup[] = [];
 
-  for (const g of SCOUT_GROUPS) {
-    let items = buckets.get(g.id);
-    if (items && items.length > 0) {
+  for (const g of allAvailableGroups) {
+    let items = buckets.get(g.id) ?? [];
+    // Para grupos personalizados, mostramos mesmo se vazios para permitir arrastar itens até eles
+    const isCustom = customCategories.some((c) => c.id === g.id);
+    if (items.length > 0 || isCustom) {
       // Se houver ordenação customizada dentro do grupo, reordena
       const order = customItemOrder?.[g.id];
-      if (order && order.length > 0) {
+      if (order && order.length > 0 && items.length > 0) {
         const itemMap = new Map(items.map((it) => [it[0], it]));
         const orderedItems: [string, unknown][] = [];
         for (const colName of order) {
@@ -211,9 +233,11 @@ export function groupEntries(
         items = orderedItems;
       }
 
+      const displayName = groupRenames[g.id] || g.name;
+
       result.push({
         id: g.id,
-        name: g.name,
+        name: displayName,
         icon: g.icon,
         description: g.description,
         items,
@@ -239,9 +263,11 @@ export function groupEntries(
       otherItems = orderedItems;
     }
 
+    const displayName = groupRenames["others"] || "Outros Dados e Métricas";
+
     result.push({
       id: "others",
-      name: "Outros Dados e Métricas",
+      name: displayName,
       icon: "FileSpreadsheet",
       description: "Colunas complementares da planilha original",
       items: otherItems,
@@ -250,4 +276,5 @@ export function groupEntries(
 
   return result;
 }
+
 

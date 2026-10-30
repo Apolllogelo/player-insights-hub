@@ -147,6 +147,14 @@ function SiteHeader() {
           >
             Perfis de posição
           </Link>
+          <Link
+            to="/planejador"
+            activeProps={{ className: "bg-secondary text-foreground" }}
+            inactiveProps={{ className: "text-muted-foreground hover:text-foreground" }}
+            className="rounded-md px-3 py-1.5 transition-colors"
+          >
+            Planejador
+          </Link>
         </nav>
       </div>
     </header>

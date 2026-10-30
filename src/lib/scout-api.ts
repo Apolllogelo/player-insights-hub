@@ -36,10 +36,7 @@ export const profilesQuery = queryOptions({
 export const playersQuery = queryOptions({
   queryKey: ["players"],
   queryFn: async (): Promise<PlayerRow[]> => {
-    const { data, error } = await supabase
-      .from("players")
-      .select("*")
-      .order("name");
+    const { data, error } = await supabase.from("players").select("*").order("name");
     if (error) throw error;
     return (data ?? []) as PlayerRow[];
   },
@@ -118,12 +115,28 @@ export async function importDataset(input: {
   if (datasetError) throw datasetError;
 
   const { toNumber } = await import("./scout-types");
+
+  // Best-effort: try to add the uid column via server function (works in Lovable Cloud)
+  try {
+    const { ensurePlayersUidColumn } = await import("./migrations.server");
+    await ensurePlayersUidColumn();
+  } catch {
+    // Ignore — column-existence check below handles the fallback
+  }
+
+  // Check whether the `uid` column exists so we don't send it if it's missing
+  const { error: uidCheckError } = await supabase.from("players").select("uid").limit(0);
+  const hasUidColumn = !uidCheckError;
+
   const payload = input.rows.map((row) => ({
     dataset_id: dataset.id,
     player_type: input.player_type,
     name: String(row[input.id_map.name] ?? "Sem nome"),
     club: input.id_map.club ? String(row[input.id_map.club] ?? "") || null : null,
     age: input.id_map.age ? toNumber(row[input.id_map.age]) : null,
+    ...(hasUidColumn && input.id_map.uid
+      ? { uid: String(row[input.id_map.uid] ?? "") || null }
+      : {}),
     position: null,
     minutes: null,
     data: row as never,
@@ -154,4 +167,3 @@ export async function resetPlayers() {
   const datasets = await supabase.from("datasets").delete().not("id", "is", null);
   if (datasets.error) throw datasets.error;
 }
-

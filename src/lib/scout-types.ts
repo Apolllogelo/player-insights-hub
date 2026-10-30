@@ -14,6 +14,7 @@ export type IdMap = {
   salary: string;
   rating: string;
   fullGames: string;
+  uid: string;
 };
 
 export type PositionProfile = {
@@ -43,6 +44,7 @@ export type PlayerRow = {
   age: number | null;
   position: string | null;
   minutes: number | null;
+  uid: string | null;
   data: Record<string, unknown>;
   created_at: string;
 };
@@ -57,6 +59,7 @@ export const emptyIdMap: IdMap = {
   salary: "",
   rating: "",
   fullGames: "",
+  uid: "",
 };
 
 /** Números em pt-BR: inteiros ficam inteiros, o resto ganha pelo menos duas casas (0,00). */
@@ -91,4 +94,25 @@ export function percentile(values: number[], value: number, invert: boolean): nu
   const below = values.filter((v) => (invert ? v > value : v < value)).length;
   const equal = values.filter((v) => v === value).length;
   return Math.round(((below + equal / 2) / values.length) * 100);
+}
+
+/** URL da face do jogador no servidor de faces do FM26. */
+export function faceUrl(uid: string | null | undefined): string | null {
+  if (!uid) return null;
+  const cleanUid = String(uid).trim();
+  if (!cleanUid) return null;
+  return `/faces/face_${cleanUid}.png`;
+}
+
+/** Resolve o UID do jogador — usa a coluna `uid` de topo, ou faz fallback
+ *  na coluna mapeada dentro de `data` quando a coluna `uid` não existe ainda. */
+export function getPlayerUid(player: PlayerRow, profile?: PositionProfile | null): string | null {
+  if (player.uid) return player.uid;
+  const uidKey = profile?.id_map?.uid;
+  if (uidKey && player.data) {
+    const val = player.data[uidKey];
+    if (val === null || val === undefined) return null;
+    return String(val);
+  }
+  return null;
 }

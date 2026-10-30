@@ -28,6 +28,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { MappingFields } from "@/components/mapping-fields";
+import { PlayerFace } from "@/components/player-face";
 import { parseSpreadsheet, type ParsedSheet, type ParsedWorkbook } from "@/lib/spreadsheet";
 import {
   datasetsQuery,
@@ -37,7 +38,7 @@ import {
   profilesQuery,
   resetPlayers,
 } from "@/lib/scout-api";
-import { emptyIdMap, formatValue, type IdMap, type Metric } from "@/lib/scout-types";
+import { emptyIdMap, formatValue, getPlayerUid, type IdMap, type Metric } from "@/lib/scout-types";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -89,7 +90,9 @@ function Home() {
 
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
-  const [sortBy, setSortBy] = useState<"name_asc" | "name_desc" | "age_asc" | "age_desc">("name_asc");
+  const [sortBy, setSortBy] = useState<
+    "name_asc" | "name_desc" | "age_asc" | "age_desc" | "rating_desc" | "rating_asc"
+  >("name_asc");
 
   const playerTypes = useMemo(
     () => Array.from(new Set((datasets.data ?? []).map((d) => d.player_type))).sort(),
@@ -101,18 +104,25 @@ function Home() {
     const list = (players.data ?? []).filter((p) => {
       if (typeFilter && p.player_type !== typeFilter) return false;
       if (!term) return true;
-      return (
-        p.name.toLowerCase().includes(term) || (p.club ?? "").toLowerCase().includes(term)
-      );
+      return p.name.toLowerCase().includes(term) || (p.club ?? "").toLowerCase().includes(term);
     });
 
     return list.sort((a, b) => {
       if (sortBy === "name_desc") return b.name.localeCompare(a.name, "pt-BR");
       if (sortBy === "age_asc") return (a.age ?? 999) - (b.age ?? 999);
       if (sortBy === "age_desc") return (b.age ?? 0) - (a.age ?? 0);
+      if (sortBy === "rating_desc" || sortBy === "rating_asc") {
+        const profileA = (profiles.data ?? []).find((pr) => pr.player_type === a.player_type);
+        const profileB = (profiles.data ?? []).find((pr) => pr.player_type === b.player_type);
+        const ratingColA = profileA?.id_map?.rating ?? "";
+        const ratingColB = profileB?.id_map?.rating ?? "";
+        const rA = ratingColA ? Number(a.data[ratingColA] ?? 0) : 0;
+        const rB = ratingColB ? Number(b.data[ratingColB] ?? 0) : 0;
+        return sortBy === "rating_desc" ? rB - rA : rA - rB;
+      }
       return a.name.localeCompare(b.name, "pt-BR");
     });
-  }, [players.data, search, typeFilter, sortBy]);
+  }, [players.data, search, typeFilter, sortBy, profiles.data]);
 
   async function handleFile(file: File) {
     try {
@@ -244,8 +254,8 @@ function Home() {
             Suas planilhas de scouting, em fichas que cabem numa tela
           </h1>
           <p className="mt-3 max-w-2xl text-sm text-muted-foreground">
-            Suba o CSV ou Excel, configure as 14 avaliações por posição e visualize percentis, destaques,
-            comparativo físico/cadastral e dados reorganizados por blocos temáticos.
+            Suba o CSV ou Excel, configure as 14 avaliações por posição e visualize percentis,
+            destaques, comparativo físico/cadastral e dados reorganizados por blocos temáticos.
           </p>
         </div>
 
@@ -440,6 +450,8 @@ function Home() {
             >
               <option value="name_asc">Nome (A-Z)</option>
               <option value="name_desc">Nome (Z-A)</option>
+              <option value="rating_desc">Maior nota primeiro</option>
+              <option value="rating_asc">Menor nota primeiro</option>
               <option value="age_asc">Mais jovem primeiro</option>
               <option value="age_desc">Mais experiente primeiro</option>
             </select>
@@ -458,10 +470,10 @@ function Home() {
         ) : (
           <div className="mt-4 divide-y divide-border/60 overflow-hidden rounded-xl border border-border/70 bg-card">
             {filteredPlayers.slice(0, 300).map((p) => {
-              // Informações extras dos dados se existirem
               const profile = (profiles.data ?? []).find((pr) => pr.player_type === p.player_type);
               const heightVal = profile?.id_map?.height ? p.data[profile.id_map.height] : undefined;
               const ratingVal = profile?.id_map?.rating ? p.data[profile.id_map.rating] : undefined;
+              const playerUid = getPlayerUid(p, profile);
 
               return (
                 <Link
@@ -472,6 +484,7 @@ function Home() {
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
+                      <PlayerFace uid={playerUid} size="xs" />
                       <p className="truncate text-sm font-medium text-foreground">{p.name}</p>
                       <Badge variant="outline" className="text-[10px] opacity-80">
                         {p.player_type}
@@ -482,7 +495,9 @@ function Home() {
                       {p.age && <span>{p.age} anos</span>}
                       {heightVal !== undefined && <span>{formatValue(heightVal)} cm</span>}
                       {ratingVal !== undefined && (
-                        <span className="font-medium text-primary">Nota: {formatValue(ratingVal)}</span>
+                        <span className="font-medium text-primary">
+                          Nota: {formatValue(ratingVal)}
+                        </span>
                       )}
                     </div>
                   </div>
@@ -505,8 +520,9 @@ function Home() {
               Resetar todos os jogadores?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Esta ação apagará todos os jogadores e planilhas importadas da base. Seus perfis de posições
-              e mapeamentos de 14 avaliações <strong>continuarão salvos</strong> para próximas importações.
+              Esta ação apagará todos os jogadores e planilhas importadas da base. Seus perfis de
+              posições e mapeamentos de 14 avaliações <strong>continuarão salvos</strong> para
+              próximas importações.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -523,7 +539,10 @@ function Home() {
       </AlertDialog>
 
       {/* Diálogo de Confirmação para Excluir Planilha Específica */}
-      <AlertDialog open={!!deleteDatasetId} onOpenChange={(open) => !open && setDeleteDatasetId(null)}>
+      <AlertDialog
+        open={!!deleteDatasetId}
+        onOpenChange={(open) => !open && setDeleteDatasetId(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
@@ -548,4 +567,3 @@ function Home() {
     </main>
   );
 }
-

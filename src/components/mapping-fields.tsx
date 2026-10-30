@@ -23,6 +23,7 @@ const ID_FIELDS: { key: keyof IdMap; label: string; required?: boolean }[] = [
   { key: "salary", label: "Salário" },
   { key: "rating", label: "Nota média" },
   { key: "fullGames", label: "Jogos completos" },
+  { key: "uid", label: "UID (foto do jogador)" },
 ];
 
 function ColumnSelect({

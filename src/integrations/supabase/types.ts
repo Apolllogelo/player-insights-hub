@@ -53,6 +53,7 @@ export type Database = {
           name: string
           player_type: string
           position: string | null
+          uid: string | null
         }
         Insert: {
           age?: number | null
@@ -65,6 +66,7 @@ export type Database = {
           name: string
           player_type: string
           position?: string | null
+          uid?: string | null
         }
         Update: {
           age?: number | null
@@ -77,6 +79,7 @@ export type Database = {
           name?: string
           player_type?: string
           position?: string | null
+          uid?: string | null
         }
         Relationships: [
           {
