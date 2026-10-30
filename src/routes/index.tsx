@@ -1,44 +1,23 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useRef, useState } from "react";
-import { toast } from "sonner";
-import {
-  Upload,
-  Trash2,
-  Search,
-  ChevronRight,
-  RotateCcw,
-  SlidersHorizontal,
-  FileSpreadsheet,
-  AlertTriangle,
-} from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
+import { Search, Upload, Bookmark, ChevronRight, ArrowUpRight } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { MappingFields } from "@/components/mapping-fields";
+import { Card } from "@/components/ui/card";
 import { PlayerFace } from "@/components/player-face";
-import { parseSpreadsheet, type ParsedSheet, type ParsedWorkbook } from "@/lib/spreadsheet";
+import { datasetsQuery, playersQuery, profilesQuery } from "@/lib/scout-api";
 import {
-  datasetsQuery,
-  deleteDataset,
-  importDataset,
-  playersQuery,
-  profilesQuery,
-  resetPlayers,
-} from "@/lib/scout-api";
-import { emptyIdMap, formatValue, getPlayerUid, type IdMap, type Metric } from "@/lib/scout-types";
+  getPlayerUid,
+  formatValue,
+  toNumber,
+  percentile,
+  type PlayerRow,
+  type PositionProfile,
+} from "@/lib/scout-types";
+import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer } from "recharts";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -46,524 +25,372 @@ export const Route = createFileRoute("/")({
       { title: "Scoutboard — Visão Geral" },
       {
         name: "description",
-        content:
-          "Suba suas planilhas de scouting, mapeie as avaliações de cada tipo de jogador e navegue por fichas individuais com percentis, comparativo físico e alertas.",
-      },
-      { property: "og:title", content: "Scout Board — planilhas de scouting em fichas claras" },
-      {
-        property: "og:description",
-        content:
-          "De 100+ colunas para uma ficha individual limpa: percentis por posição, comparativo de identificação e pontos de atenção automáticos.",
+        content: "Dashboard de scouting com indicadores, jogadores em destaque e relatório dinâmico.",
       },
     ],
   }),
-  component: Home,
-  errorComponent: ({ error }) => (
-    <div role="alert" className="mx-auto max-w-6xl px-4 py-16 text-sm text-destructive">
-      {error.message}
-    </div>
-  ),
-  notFoundComponent: () => <div className="p-8">Nada por aqui.</div>,
+  component: VisaoGeralPage,
 });
 
-function Home() {
-  const queryClient = useQueryClient();
-  const datasets = useQuery(datasetsQuery);
-  const profiles = useQuery(profilesQuery);
+function getInitials(name: string) {
+  return name
+    .split(" ")
+    .slice(0, 2)
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase();
+}
+
+function getAvatarColor(name: string) {
+  const colors = [
+    "bg-amber-100 text-amber-700",
+    "bg-blue-100 text-blue-700",
+    "bg-violet-100 text-violet-700",
+    "bg-pink-100 text-pink-700",
+    "bg-emerald-100 text-emerald-700",
+    "bg-orange-100 text-orange-700",
+  ];
+  const index = name.charCodeAt(0) % colors.length;
+  return colors[index];
+}
+
+function getStatusBadge(status?: string) {
+  if (status === "Prioridade") {
+    return <Badge className="h-5 rounded-sm bg-orange-100 text-[10px] text-orange-700 hover:bg-orange-100">Prioridade</Badge>;
+  }
+  if (status === "Monitorar") {
+    return <Badge className="h-5 rounded-sm bg-blue-100 text-[10px] text-blue-700 hover:bg-blue-100">Monitorar</Badge>;
+  }
+  if (status === "Observação") {
+    return <Badge className="h-5 rounded-sm bg-gray-100 text-[10px] text-gray-700 hover:bg-gray-100">Observação</Badge>;
+  }
+  return null;
+}
+
+function computeRadarData(player: PlayerRow, profile: PositionProfile | null | undefined) {
+  if (!profile || !profile.metrics.length) return [];
+  const data = profile.metrics.slice(0, 6).map((metric) => {
+    const val = toNumber(player.data[metric.column]);
+    return {
+      subject: metric.label.length > 12 ? metric.label.slice(0, 12) + "..." : metric.label,
+      value: val ?? 50,
+      fullMark: 100,
+    };
+  });
+  return data;
+}
+
+function VisaoGeralPage() {
   const players = useQuery(playersQuery);
-
-  const fileRef = useRef<HTMLInputElement>(null);
-  const [workbook, setWorkbook] = useState<ParsedWorkbook | null>(null);
-  const [sheetIndex, setSheetIndex] = useState(0);
-  const [fileName, setFileName] = useState("");
-  const [playerType, setPlayerType] = useState("");
-  const [idMap, setIdMap] = useState<IdMap>(emptyIdMap);
-  const [metrics, setMetrics] = useState<Metric[]>([]);
-  const [importing, setImporting] = useState(false);
-  const [resetting, setResetting] = useState(false);
-
-  // Modais de confirmação
-  const [resetDialogOpen, setResetDialogOpen] = useState(false);
-  const [deleteDatasetId, setDeleteDatasetId] = useState<string | null>(null);
-
-  const sheet: ParsedSheet | null = workbook?.sheets[sheetIndex] ?? null;
+  const profiles = useQuery(profilesQuery);
+  const datasets = useQuery(datasetsQuery);
 
   const [search, setSearch] = useState("");
-  const [typeFilter, setTypeFilter] = useState("");
-  const [sortBy, setSortBy] = useState<
-    "name_asc" | "name_desc" | "age_asc" | "age_desc" | "rating_desc" | "rating_asc"
-  >("name_asc");
+  const [activeFilter, setActiveFilter] = useState<"all" | "priority" | "monitor">("all");
+  const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
 
-  const playerTypes = useMemo(
-    () => Array.from(new Set((datasets.data ?? []).map((d) => d.player_type))).sort(),
-    [datasets.data],
-  );
-
-  const filteredPlayers = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    const list = (players.data ?? []).filter((p) => {
-      if (typeFilter && p.player_type !== typeFilter) return false;
-      if (!term) return true;
-      return p.name.toLowerCase().includes(term) || (p.club ?? "").toLowerCase().includes(term);
-    });
-
-    return list.sort((a, b) => {
-      if (sortBy === "name_desc") return b.name.localeCompare(a.name, "pt-BR");
-      if (sortBy === "age_asc") return (a.age ?? 999) - (b.age ?? 999);
-      if (sortBy === "age_desc") return (b.age ?? 0) - (a.age ?? 0);
-      if (sortBy === "rating_desc" || sortBy === "rating_asc") {
-        const profileA = (profiles.data ?? []).find((pr) => pr.player_type === a.player_type);
-        const profileB = (profiles.data ?? []).find((pr) => pr.player_type === b.player_type);
-        const ratingColA = profileA?.id_map?.rating ?? "";
-        const ratingColB = profileB?.id_map?.rating ?? "";
-        const rA = ratingColA ? Number(a.data[ratingColA] ?? 0) : 0;
-        const rB = ratingColB ? Number(b.data[ratingColB] ?? 0) : 0;
-        return sortBy === "rating_desc" ? rB - rA : rA - rB;
-      }
-      return a.name.localeCompare(b.name, "pt-BR");
-    });
-  }, [players.data, search, typeFilter, sortBy, profiles.data]);
-
-  async function handleFile(file: File) {
-    try {
-      const parsed = await parseSpreadsheet(file);
-      if (!parsed.sheets.length) {
-        toast.error("Não encontrei colunas nessa planilha.");
-        return;
-      }
-      setWorkbook(parsed);
-      setFileName(file.name);
-      setMetrics([]);
-      setIdMap(emptyIdMap);
-      selectSheet(parsed, 0);
-      toast.success(
-        parsed.sheets.length > 1
-          ? `${parsed.sheets.length} abas lidas. Escolha qual quer importar.`
-          : `${parsed.sheets[0]!.rows.length} linhas e ${parsed.sheets[0]!.columns.length} colunas lidas.`,
+  const playerList = useMemo(() => {
+    let list = players.data ?? [];
+    if (search.trim()) {
+      const term = search.toLowerCase();
+      list = list.filter(
+        (p) =>
+          p.name.toLowerCase().includes(term) ||
+          (p.club ?? "").toLowerCase().includes(term),
       );
-    } catch {
-      toast.error("Não consegui ler o arquivo. Use CSV ou Excel (.xlsx).");
     }
-  }
+    if (activeFilter === "priority") {
+      list = list.filter((p) => (p.data as any)?.status === "Prioridade");
+    }
+    if (activeFilter === "monitor") {
+      list = list.filter((p) => (p.data as any)?.status === "Monitorar");
+    }
+    return list.slice(0, 50);
+  }, [players.data, search, activeFilter]);
 
-  /** "🛡️Zagueiros" → "zagueiros" */
-  function suggestType(sheetName: string) {
-    return sheetName
-      .replace(/[^\p{L}\p{N}\s/-]/gu, "")
-      .trim()
-      .toLowerCase();
-  }
+  const selectedPlayer = useMemo(() => {
+    if (selectedPlayerId) {
+      return (players.data ?? []).find((p) => p.id === selectedPlayerId);
+    }
+    return playerList[0];
+  }, [selectedPlayerId, playerList, players.data]);
 
-  function selectSheet(book: ParsedWorkbook, index: number) {
-    setSheetIndex(index);
-    const target = book.sheets[index];
-    if (!target) return;
-    applyProfile(suggestType(target.name), target);
-  }
+  const selectedProfile = useMemo(() => {
+    if (!selectedPlayer) return null;
+    return (profiles.data ?? []).find((pr) => pr.player_type === selectedPlayer.player_type);
+  }, [selectedPlayer, profiles.data]);
 
-  function applyProfile(type: string, target: ParsedSheet | null = sheet) {
-    setPlayerType(type);
-    const profile = (profiles.data ?? []).find(
-      (p) => p.player_type.toLowerCase() === type.trim().toLowerCase(),
-    );
-    if (profile && target) {
-      const known = new Set(target.columns);
-      const saved = { ...emptyIdMap, ...profile.id_map };
-      setIdMap(
-        Object.fromEntries(
-          Object.entries(saved).map(([k, v]) => [k, known.has(String(v)) ? v : ""]),
-        ) as IdMap,
-      );
-      setMetrics(profile.metrics.filter((m) => known.has(m.column)));
-    } else if (target) {
-      setIdMap((prev) => (target.columns.includes(prev.name) ? prev : emptyIdMap));
-      setMetrics((prev) => prev.filter((m) => target.columns.includes(m.column)));
-    }
-  }
+  const radarData = useMemo(() => {
+    if (!selectedPlayer) return [];
+    return computeRadarData(selectedPlayer, selectedProfile);
+  }, [selectedPlayer, selectedProfile]);
 
-  async function handleImport() {
-    if (!sheet) return;
-    if (!playerType.trim()) {
-      toast.error("Informe o tipo de jogador (ex: zagueiro).");
-      return;
-    }
-    if (!idMap.name) {
-      toast.error("Escolha a coluna com o nome do jogador.");
-      return;
-    }
-    const validMetrics = metrics.filter((m) => m.column);
-    if (!validMetrics.length) {
-      toast.error("Escolha ao menos uma avaliação.");
-      return;
-    }
-    setImporting(true);
-    try {
-      await importDataset({
-        name: workbook && workbook.sheets.length > 1 ? `${fileName} · ${sheet.name}` : fileName,
-        player_type: playerType.trim(),
-        columns: sheet.columns,
-        rows: sheet.rows,
-        id_map: idMap,
-        metrics: validMetrics.map((m) => ({ ...m, label: m.label || m.column })),
-      });
-      await queryClient.invalidateQueries();
-      setWorkbook(null);
-      setFileName("");
-      if (fileRef.current) fileRef.current.value = "";
-      toast.success("Planilha importada com sucesso!");
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Falha ao importar.");
-    } finally {
-      setImporting(false);
-    }
-  }
+  const totalPlayers = (players.data ?? []).length;
+  const priorityCount = (players.data ?? []).filter((p) => (p.data as any)?.status === "Prioridade").length;
+  const monitorCount = (players.data ?? []).filter((p) => (p.data as any)?.status === "Monitorar").length;
 
-  async function handleConfirmReset() {
-    setResetting(true);
-    try {
-      await resetPlayers();
-      await queryClient.invalidateQueries();
-      setResetDialogOpen(false);
-      toast.success("Todos os jogadores e planilhas foram resetados.");
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Não consegui resetar.");
-    } finally {
-      setResetting(false);
-    }
-  }
-
-  async function handleConfirmDeleteDataset() {
-    if (!deleteDatasetId) return;
-    try {
-      await deleteDataset(deleteDatasetId);
-      await queryClient.invalidateQueries();
-      setDeleteDatasetId(null);
-      toast.success("Planilha removida.");
-    } catch {
-      toast.error("Não consegui remover a planilha.");
-    }
-  }
-
-  const hasAnyData = (datasets.data ?? []).length > 0 || (players.data ?? []).length > 0;
+  const averageRating = useMemo(() => {
+    const ratings = (players.data ?? [])
+      .map((p) => {
+        const profile = (profiles.data ?? []).find((pr) => pr.player_type === p.player_type);
+        const ratingCol = profile?.id_map?.rating;
+        if (!ratingCol) return null;
+        return toNumber(p.data[ratingCol]);
+      })
+      .filter((r): r is number => r !== null);
+    if (!ratings.length) return "—";
+    const avg = ratings.reduce((a, b) => a + b, 0) / ratings.length;
+    return avg.toFixed(1);
+  }, [players.data, profiles.data]);
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-10">
-      <div className="flex flex-wrap items-start justify-between gap-4">
+    <div className="p-6">
+      <div className="mb-6 flex items-start justify-between">
         <div>
-          <h1 className="max-w-2xl text-3xl font-semibold sm:text-4xl">
-            Suas planilhas de scouting, em fichas que cabem numa tela
-          </h1>
-          <p className="mt-3 max-w-2xl text-sm text-muted-foreground">
-            Suba o CSV ou Excel, configure as 14 avaliações por posição e visualize percentis,
-            destaques, comparativo físico/cadastral e dados reorganizados por blocos temáticos.
+          <div className="mb-1 font-mono text-[11px] uppercase tracking-wider text-[#6B7280]">
+            SCOUTING / TEMPORADA 2025–26
+          </div>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Visão geral</h1>
+          <p className="mt-1 text-sm text-[#6B7280]">
+            Acompanhe jogadores, avaliações e prioridades do departamento
           </p>
         </div>
-
-        {hasAnyData && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setResetDialogOpen(true)}
-            className="border-destructive/30 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
-          >
-            <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
-            Resetar Base de Jogadores
-          </Button>
-        )}
+        <div className="flex items-center gap-1.5 rounded-md bg-emerald-50 px-2.5 py-1 text-xs text-emerald-700">
+          <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+          Base atualizada há 5 min
+        </div>
       </div>
 
-      {/* Upload de Planilha */}
-      <section className="mt-8 rounded-xl border border-border/70 bg-card p-5">
-        <div className="flex flex-wrap items-center gap-3">
-          <input
-            ref={fileRef}
-            type="file"
-            accept=".csv,.xlsx,.xls"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) void handleFile(file);
-            }}
-          />
-          <Button onClick={() => fileRef.current?.click()}>
-            <Upload className="mr-2 h-4 w-4" />
-            Escolher planilha
-          </Button>
-          <span className="text-sm text-muted-foreground">
-            {sheet
-              ? `${fileName} · ${sheet.rows.length} jogadores · ${sheet.columns.length} colunas`
-              : "CSV ou Excel (.xlsx) — cada aba pode ser um tipo de jogador"}
-          </span>
-        </div>
-
-        {workbook && workbook.sheets.length > 1 && (
-          <div className="mt-5 space-y-2">
-            <Label className="text-xs text-muted-foreground">
-              Abas encontradas — importe uma por vez
-            </Label>
-            <div className="flex flex-wrap gap-2">
-              {workbook.sheets.map((s, i) => (
-                <button
-                  key={s.name}
-                  type="button"
-                  onClick={() => selectSheet(workbook, i)}
-                  className={`rounded-full border px-3 py-1.5 text-xs transition-colors ${
-                    i === sheetIndex
-                      ? "border-primary bg-primary/15 text-primary"
-                      : "border-border/70 bg-secondary text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  {s.name}
-                  <span className="ml-1.5 opacity-60">{s.rows.length}</span>
-                </button>
-              ))}
-            </div>
+      <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card className="border-[#1F2127] bg-[#0F1015] p-4">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-xs text-[#9CA3AF]">Jogadores analisados</span>
           </div>
-        )}
-
-        {sheet && (
-          <div className="mt-6 space-y-6 border-t border-border/70 pt-6">
-            <div className="grid gap-3 sm:max-w-sm">
-              <Label className="text-xs text-muted-foreground">
-                Tipo de jogador desta planilha *
-              </Label>
-              <Input
-                value={playerType}
-                list="player-types"
-                placeholder="ex: zagueiro"
-                className="bg-secondary"
-                onChange={(e) => applyProfile(e.target.value)}
-              />
-              <datalist id="player-types">
-                {(profiles.data ?? []).map((p) => (
-                  <option key={p.id} value={p.player_type} />
-                ))}
-              </datalist>
-              <p className="text-xs text-muted-foreground">
-                Se você já mapeou este tipo antes, o mapeamento é carregado automaticamente.
-              </p>
-            </div>
-
-            <MappingFields
-              columns={sheet.columns}
-              idMap={idMap}
-              metrics={metrics}
-              onIdMapChange={setIdMap}
-              onMetricsChange={setMetrics}
-            />
-
-            <div className="flex gap-2">
-              <Button onClick={() => void handleImport()} disabled={importing}>
-                {importing ? "Importando…" : "Salvar mapeamento e importar"}
-              </Button>
-              <Button variant="ghost" onClick={() => setWorkbook(null)}>
-                Cancelar
-              </Button>
-            </div>
+          <div className="mb-2 flex items-end gap-2">
+            <span className="text-2xl font-bold text-white">{totalPlayers}</span>
+            <span className="mb-0.5 text-xs text-emerald-400">+12%</span>
           </div>
-        )}
-      </section>
-
-      {/* Seção de Planilhas Importadas */}
-      {!!(datasets.data ?? []).length && (
-        <section className="mt-10">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="font-display text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-              Planilhas importadas ({(datasets.data ?? []).length})
-            </h2>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setResetDialogOpen(true)}
-              className="text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
-              disabled={resetting}
-            >
-              <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
-              {resetting ? "Resetando…" : "Resetar todas as planilhas"}
-            </Button>
+          <div className="flex items-center justify-between text-xs text-[#6B7280]">
+            <div className="flex -space-x-2">
+              <div className="h-6 w-6 rounded-md bg-blue-500/20" />
+              <div className="h-6 w-6 rounded-md bg-violet-500/20" />
+              <div className="h-6 w-6 rounded-md bg-emerald-500/20" />
+            </div>
+            <span>+{Math.min(totalPlayers, 23)} este mês</span>
           </div>
-          <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {(datasets.data ?? []).map((d) => (
-              <div
-                key={d.id}
-                className="flex items-center justify-between gap-2 rounded-lg border border-border/70 bg-surface p-3 transition-colors hover:border-border"
-              >
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium">{d.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {d.player_type} · {d.row_count} jogadores · {d.columns.length} colunas
-                  </p>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive"
-                  onClick={() => setDeleteDatasetId(d.id)}
-                  title="Excluir planilha"
-                >
-                  <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
-                </Button>
-              </div>
+        </Card>
+
+        <Card className="border-border bg-white p-4">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-xs text-[#6B7280]">Em observação</span>
+          </div>
+          <div className="mb-2 flex items-end gap-2">
+            <span className="text-2xl font-bold text-foreground">{monitorCount}</span>
+          </div>
+          <div className="space-y-1.5">
+            <div className="h-1.5 w-full rounded-full bg-gray-100">
+              <div className="h-1.5 rounded-full bg-[#3458D4]" style={{ width: "65%" }} />
+            </div>
+            <span className="text-xs text-[#6B7280]">Meta mensal: 40</span>
+          </div>
+        </Card>
+
+        <Card className="border-border bg-white p-4">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-xs text-[#6B7280]">Na shortlist</span>
+          </div>
+          <div className="mb-2 flex items-end gap-2">
+            <span className="text-2xl font-bold text-foreground">{priorityCount}</span>
+            <span className="mb-0.5 text-xs text-[#6B7280]">{priorityCount} alta prioridade</span>
+          </div>
+          <div className="flex -space-x-2">
+            <div className="h-6 w-6 rounded-md bg-orange-100" />
+            <div className="h-6 w-6 rounded-md bg-red-100" />
+          </div>
+        </Card>
+
+        <Card className="border-border bg-white p-4">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-xs text-[#6B7280]">Nota média</span>
+          </div>
+          <div className="mb-2 flex items-end gap-2">
+            <span className="text-2xl font-bold text-foreground">{averageRating}</span>
+            <span className="mb-0.5 text-xs text-emerald-600">+0.2</span>
+          </div>
+          <div className="flex h-8 items-end gap-0.5">
+            {[40, 55, 48, 62, 58, 70, 65].map((h, i) => (
+              <div key={i} className="w-1.5 rounded-sm bg-[#3458D4]/40" style={{ height: `${h}%` }} />
             ))}
           </div>
-        </section>
-      )}
+        </Card>
+      </div>
 
-      {/* Seção de Jogadores */}
-      <section className="mt-10">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h2 className="font-display text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-              Jogadores Cadastrados ({filteredPlayers.length})
-            </h2>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              Clique em um jogador para ver a ficha completa com percentis e comparativo
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Buscar nome ou clube"
-                className="w-56 bg-secondary pl-8 text-sm"
-              />
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+        <div className="lg:col-span-7">
+          <Card className="border-border bg-white">
+            <div className="flex items-center justify-between border-b border-border px-5 py-4">
+              <h2 className="text-base font-semibold">Jogadores em destaque</h2>
+              <Link to="/jogadores" className="text-xs text-[#3458D4] hover:underline">
+                Ver todos
+              </Link>
             </div>
-            <select
-              value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value)}
-              className="h-9 rounded-md border border-input bg-secondary px-2.5 text-xs"
-            >
-              <option value="">Todos os tipos</option>
-              {playerTypes.map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
-              ))}
-            </select>
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-              className="h-9 rounded-md border border-input bg-secondary px-2.5 text-xs"
-            >
-              <option value="name_asc">Nome (A-Z)</option>
-              <option value="name_desc">Nome (Z-A)</option>
-              <option value="rating_desc">Maior nota primeiro</option>
-              <option value="rating_asc">Menor nota primeiro</option>
-              <option value="age_asc">Mais jovem primeiro</option>
-              <option value="age_desc">Mais experiente primeiro</option>
-            </select>
-          </div>
+            <div className="flex items-center gap-3 border-b border-border px-5 py-3">
+              <div className="relative flex-1">
+                <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#6B7280]" />
+                <Input
+                  placeholder="Buscar por jogador ou clube"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="h-8 pl-8 text-sm"
+                />
+              </div>
+              <div className="flex items-center gap-1 rounded-md bg-gray-50 p-1">
+                <Button
+                  size="sm"
+                  variant={activeFilter === "all" ? "default" : "ghost"}
+                  className={`h-6 px-2.5 text-xs ${activeFilter === "all" ? "bg-white shadow-sm" : ""}`}
+                  onClick={() => setActiveFilter("all")}
+                >
+                  Todos
+                </Button>
+                <Button
+                  size="sm"
+                  variant={activeFilter === "priority" ? "default" : "ghost"}
+                  className={`h-6 px-2.5 text-xs ${activeFilter === "priority" ? "bg-white shadow-sm" : ""}`}
+                  onClick={() => setActiveFilter("priority")}
+                >
+                  Prioridade
+                </Button>
+                <Button
+                  size="sm"
+                  variant={activeFilter === "monitor" ? "default" : "ghost"}
+                  className={`h-6 px-2.5 text-xs ${activeFilter === "monitor" ? "bg-white shadow-sm" : ""}`}
+                  onClick={() => setActiveFilter("monitor")}
+                >
+                  Monitorar
+                </Button>
+              </div>
+            </div>
+            <div className="divide-y divide-border">
+              {playerList.map((p) => {
+                const profile = (profiles.data ?? []).find((pr) => pr.player_type === p.player_type);
+                const ratingCol = profile?.id_map?.rating;
+                const rating = ratingCol ? toNumber(p.data[ratingCol]) : null;
+                const isSelected = selectedPlayer?.id === p.id;
+                const status = (p.data as any)?.status;
+
+                return (
+                  <button
+                    key={p.id}
+                    onClick={() => setSelectedPlayerId(p.id)}
+                    className={`flex w-full items-center gap-3 px-5 py-3 text-left transition-colors ${
+                      isSelected
+                        ? "border-l-2 border-[#3458D4] bg-blue-50/50"
+                        : "hover:bg-gray-50"
+                    }`}
+                  >
+                    <div className={`flex h-9 w-9 items-center justify-center rounded-md text-xs font-medium ${getAvatarColor(p.name)}`}>
+                      {getInitials(p.name)}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="truncate text-sm font-medium text-foreground">{p.name}</p>
+                        <span className="text-xs text-[#6B7280]">{p.player_type}</span>
+                      </div>
+                      <p className="text-xs text-[#6B7280]">{p.club || "Sem clube"}</p>
+                    </div>
+                    <div className="w-12 text-center text-sm text-foreground">{p.age ?? "—"}</div>
+                    <div className="w-12 text-center text-sm font-medium text-[#3458D4]">
+                      {rating !== null ? rating.toFixed(1) : "—"}
+                    </div>
+                    <div className="w-20">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-foreground">78</span>
+                        <div className="h-1 flex-1 rounded-full bg-gray-100">
+                          <div className="h-1 rounded-full bg-[#3458D4]" style={{ width: "78%" }} />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="w-24">{getStatusBadge(status)}</div>
+                    <ChevronRight className="h-4 w-4 text-[#6B7280]" />
+                  </button>
+                );
+              })}
+            </div>
+          </Card>
         </div>
 
-        {players.isLoading ? (
-          <p className="mt-6 text-sm text-muted-foreground">Carregando jogadores…</p>
-        ) : filteredPlayers.length === 0 ? (
-          <div className="mt-6 rounded-xl border border-dashed border-border/80 p-8 text-center">
-            <FileSpreadsheet className="mx-auto h-8 w-8 text-muted-foreground/60" />
-            <p className="mt-2 text-sm text-muted-foreground">
-              Nenhum jogador encontrado. Importe uma planilha no topo para começar.
-            </p>
-          </div>
-        ) : (
-          <div className="mt-4 divide-y divide-border/60 overflow-hidden rounded-xl border border-border/70 bg-card">
-            {filteredPlayers.slice(0, 300).map((p) => {
-              const profile = (profiles.data ?? []).find((pr) => pr.player_type === p.player_type);
-              const heightVal = profile?.id_map?.height ? p.data[profile.id_map.height] : undefined;
-              const ratingVal = profile?.id_map?.rating ? p.data[profile.id_map.rating] : undefined;
-              const playerUid = getPlayerUid(p, profile);
-
-              return (
-                <Link
-                  key={p.id}
-                  to="/jogador/$id"
-                  params={{ id: p.id }}
-                  className="flex items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-secondary/60"
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <PlayerFace uid={playerUid} size="xs" />
-                      <p className="truncate text-sm font-medium text-foreground">{p.name}</p>
-                      <Badge variant="outline" className="text-[10px] opacity-80">
-                        {p.player_type}
-                      </Badge>
-                    </div>
-                    <div className="mt-1 flex flex-wrap items-center gap-x-3 text-xs text-muted-foreground">
-                      <span>{p.club || "Sem clube"}</span>
-                      {p.age && <span>{p.age} anos</span>}
-                      {heightVal !== undefined && <span>{formatValue(heightVal)} cm</span>}
-                      {ratingVal !== undefined && (
-                        <span className="font-medium text-primary">
-                          Nota: {formatValue(ratingVal)}
-                        </span>
-                      )}
-                    </div>
+        <div className="lg:col-span-5">
+          <Card className="border-border bg-white">
+            <div className="border-b border-border px-5 py-4">
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-3">
+                  <div className={`flex h-12 w-12 items-center justify-center rounded-md text-sm font-medium ${getAvatarColor(selectedPlayer?.name || "")}`}>
+                    {selectedPlayer ? getInitials(selectedPlayer.name) : "—"}
                   </div>
-                  <div className="flex items-center gap-2">
-                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <h3 className="font-semibold text-foreground">{selectedPlayer?.name || "—"}</h3>
+                    <p className="text-sm text-[#6B7280]">
+                      {selectedPlayer?.club || "Sem clube"} · {selectedPlayer?.player_type}
+                    </p>
                   </div>
-                </Link>
-              );
-            })}
-          </div>
-        )}
-      </section>
-
-      {/* Diálogo de Confirmação para Resetar Todos os Jogadores */}
-      <AlertDialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
-              <AlertTriangle className="h-5 w-5" />
-              Resetar todos os jogadores?
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              Esta ação apagará todos os jogadores e planilhas importadas da base. Seus perfis de
-              posições e mapeamentos de 14 avaliações <strong>continuarão salvos</strong> para
-              próximas importações.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={resetting}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => void handleConfirmReset()}
-              disabled={resetting}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {resetting ? "Resetando…" : "Sim, resetar base"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Diálogo de Confirmação para Excluir Planilha Específica */}
-      <AlertDialog
-        open={!!deleteDatasetId}
-        onOpenChange={(open) => !open && setDeleteDatasetId(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <Trash2 className="h-5 w-5 text-destructive" />
-              Excluir esta planilha?
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              Os dados e os jogadores vinculados a esta planilha específica serão removidos.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => void handleConfirmDeleteDataset()}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Excluir planilha
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </main>
+                </div>
+                <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <Bookmark className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+            <div className="border-b border-border px-5">
+              <div className="flex gap-6">
+                <button className="border-b-2 border-[#3458D4] pb-2 text-sm font-medium text-foreground">
+                  Visão geral
+                </button>
+                <button className="pb-2 text-sm text-[#6B7280]">Métricas</button>
+                <button className="pb-2 text-sm text-[#6B7280]">Histórico</button>
+              </div>
+            </div>
+            <div className="p-5">
+              <div className="mb-5 h-[200px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <RadarChart data={radarData}>
+                    <PolarGrid stroke="#E5E7EB" />
+                    <PolarAngleAxis dataKey="subject" tick={{ fontSize: 10, fill: "#6B7280" }} />
+                    <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} />
+                    <Radar name="Jogador" dataKey="value" stroke="#3458D4" fill="#3458D4" fillOpacity={0.15} />
+                  </RadarChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="mb-4 grid grid-cols-3 gap-3">
+                <div className="rounded-lg border border-border p-3 text-center">
+                  <p className="text-xs text-[#6B7280]">Nota geral</p>
+                  <p className="mt-1 text-lg font-semibold text-foreground">7.8</p>
+                  <p className="text-xs text-[#3458D4]">Top 15%</p>
+                </div>
+                <div className="rounded-lg border border-border p-3 text-center">
+                  <p className="text-xs text-[#6B7280]">Potencial</p>
+                  <p className="mt-1 text-lg font-semibold text-foreground">8.4</p>
+                  <p className="text-xs text-emerald-600">Acima da média</p>
+                </div>
+                <div className="rounded-lg border border-border p-3 text-center">
+                  <p className="text-xs text-[#6B7280]">Idade</p>
+                  <p className="mt-1 text-lg font-semibold text-foreground">{selectedPlayer?.age ?? "—"}</p>
+                  <p className="text-xs text-[#6B7280]">—</p>
+                </div>
+              </div>
+              <div className="mb-4 rounded-lg border-l-2 border-orange-400 bg-orange-50/50 p-3">
+                <p className="text-xs font-medium text-orange-900">Nota de observação</p>
+                <p className="mt-1 text-xs text-orange-800">
+                  Bom posicionamento defensivo. Necessita evoluir na saída de bola sob pressão.
+                </p>
+              </div>
+              <Button className="w-full bg-[#3458D4] hover:bg-[#2A4BC4]">
+                Abrir perfil completo
+                <ArrowUpRight className="ml-2 h-4 w-4" />
+              </Button>
+            </div>
+          </Card>
+        </div>
+      </div>
+    </div>
   );
 }
