@@ -239,13 +239,7 @@ function VisaoGeralPage() {
 
         {/* Lista + Relatório lado a lado, mesmo wrapper */}
         <div className="grid grid-cols-[minmax(0,1fr)_380px] gap-16 items-start min-w-0 w-full max-w-full overflow-x-hidden">
-          <style>{`
-            @media (max-width: 1023px) {
-              .overview-layout { grid-template-columns: minmax(0, 1fr) !important; }
-            }
-          `}</style>
-          <div className="overview-layout min-w-0 w-full overflow-x-hidden">
-
+          <>
             {/* Coluna esquerda: UM card branco com lista */}
             <div className="bg-white border-1 border-[#E3E1DA] rounded-[4px] overflow-hidden flex flex-col min-w-0 w-full">
               {/* Cabeçalho */}
@@ -487,7 +481,7 @@ function VisaoGeralPage() {
                 </div>
               </div>
             )}
-          </div>
+          </>
         </div>
       </div>
     </div>
