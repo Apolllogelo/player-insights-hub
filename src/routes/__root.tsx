@@ -23,7 +23,6 @@ import {
   Camera,
 } from "lucide-react";
 import { toast } from "sonner";
-import html2canvas from "html2canvas";
 
 import appCss from "../styles.css?url";
 import { Toaster } from "@/components/ui/sonner";
@@ -201,71 +200,53 @@ function SidebarNav() {
         return;
       }
 
-      // Remove cores oklab de estilos inline no documento original
-      const walker = document.createTreeWalker(document, NodeFilter.SHOW_ELEMENT);
-      let n: Node | null;
-      while ((n = walker.nextNode())) {
-        const el = n as HTMLElement;
-        for (const prop of Object.keys(el.style)) {
-          if (String(el.style.getPropertyValue(prop)).includes("oklab")) {
-            el.style.removeProperty(prop);
-          }
-        }
-      }
+      // Espera fontes carregarem (como no projeto de referência)
+      await document.fonts.ready;
 
-      // Remove cores oklab de regras CSS externas
-      for (const sheet of Array.from(document.styleSheets)) {
-        try {
-          const rules = Array.from((sheet as CSSStyleSheet).cssRules || []);
-          for (const rule of rules) {
-            const cssRule = rule as CSSStyleRule;
-            if (cssRule.style && String(cssRule.style.cssText).includes("oklab")) {
-              cssRule.style.cssText = String(cssRule.style.cssText).replace(/oklab\([^)]*\)/g, "");
+      // Remove cores oklab de estilos inline no documento original
+      const stripOklab = (doc: Document) => {
+        const walker = doc.createTreeWalker(doc, NodeFilter.SHOW_ELEMENT);
+        let n: Node | null;
+        while ((n = walker.nextNode())) {
+          const el = n as HTMLElement;
+          for (const prop of Object.keys(el.style)) {
+            if (String(el.style.getPropertyValue(prop)).includes("oklab") || String(el.style.getPropertyValue(prop)).includes("oklch")) {
+              el.style.removeProperty(prop);
             }
           }
-        } catch {
-          // cross-origin sheet: ignora
         }
-      }
-
-      const canvas = await html2canvas(element as HTMLElement, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        backgroundColor: "#F7F8F6",
-        scrollX: 0,
-        scrollY: 0,
-        ignoreElements: (el) => {
-          return (
-            el.classList?.contains("toaster") ||
-            el.getAttribute("role") === "status" ||
-            el.getAttribute("data-sonner-toaster") === "true"
-          );
-        },
-        onclone: (clonedDoc: Document) => {
-          const el = clonedDoc.querySelector("main");
-          if (el) {
-            el.style.margin = "0";
-            el.style.padding = "24px";
-            el.style.backgroundColor = "#F7F8F6";
-            el.style.minHeight = "100vh";
-          }
-
-          // Backup: remove cores oklab de estilos inline no clone
-          const w = clonedDoc.createTreeWalker(clonedDoc, NodeFilter.SHOW_ELEMENT);
-          let node: Node | null;
-          while ((node = w.nextNode())) {
-            const el = node as HTMLElement;
-            for (const prop of Object.keys(el.style)) {
-              if (String(el.style.getPropertyValue(prop)).includes("oklab")) {
-                el.style.removeProperty(prop);
+        for (const sheet of Array.from(doc.styleSheets)) {
+          try {
+            const rules = Array.from((sheet as CSSStyleSheet).cssRules || []);
+            for (const rule of rules) {
+              const cssRule = rule as CSSStyleRule;
+              if (cssRule.style) {
+                const cssText = String(cssRule.style.cssText);
+                if (cssText.includes("oklab") || cssText.includes("oklch")) {
+                  cssRule.style.cssText = cssText.replace(/oklab\([^)]*\)/g, "").replace(/oklch\([^)]*\)/g, "");
+                }
               }
             }
+          } catch {
+            // cross-origin sheet: ignora
           }
-        },
+        }
+      };
+      stripOklab(document);
+
+      const { toPng } = await import("html-to-image");
+
+      const dataUrl = await toPng(element as HTMLElement, {
+        backgroundColor: "#F7F8F6",
+        cacheBust: true,
+        canvasHeight: element.scrollHeight * 2,
+        canvasWidth: element.scrollWidth * 2,
+        filter: (node) => !(node instanceof HTMLElement && (node.classList?.contains("toaster") || node.getAttribute("role") === "status" || node.getAttribute("data-sonner-toaster") === "true")),
+        height: element.scrollHeight,
+        pixelRatio: 2,
+        width: element.scrollWidth,
       });
 
-      const dataUrl = canvas.toDataURL("image/png");
       const link = document.createElement("a");
       const timestamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
       link.download = `scoutboard-${timestamp}.png`;
