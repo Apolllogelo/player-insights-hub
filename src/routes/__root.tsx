@@ -201,6 +201,34 @@ function SidebarNav() {
         return;
       }
 
+      // html2canvas não suporta cores oklab; remove-as do documento original ANTES de capturar
+      function stripOklab(doc: Document) {
+        const walker = doc.createTreeWalker(doc, NodeFilter.SHOW_ELEMENT);
+        let n: Node | null;
+        while ((n = walker.nextNode())) {
+          const el = n as HTMLElement;
+          for (const prop of Object.keys(el.style)) {
+            if (String(el.style.getPropertyValue(prop)).includes("oklab")) {
+              el.style.removeProperty(prop);
+            }
+          }
+        }
+        for (const sheet of Array.from(doc.styleSheets)) {
+          try {
+            const rules = Array.from((sheet as CSSStyleSheet).cssRules || []);
+            for (const rule of rules) {
+              const cssRule = rule as CSSStyleRule;
+              if (cssRule.style && String(cssRule.style.cssText).includes("oklab")) {
+                cssRule.style.cssText = String(cssRule.style.cssText).replace(/oklab\([^)]*\)/g, "");
+              }
+            }
+          } catch {
+            // cross-origin sheet: ignora
+          }
+        }
+      }
+      stripOklab(document);
+
       const canvas = await html2canvas(element as HTMLElement, {
         scale: 2,
         useCORS: true,
@@ -224,7 +252,7 @@ function SidebarNav() {
             el.style.minHeight = "100vh";
           }
 
-          // Remove cores oklab de estilos inline (html2canvas não as suporta)
+          // Backup: remove cores oklab de estilos inline no clone
           const walker = clonedDoc.createTreeWalker(clonedDoc, NodeFilter.SHOW_ELEMENT);
           let node: Node | null;
           while ((node = walker.nextNode())) {
@@ -233,21 +261,6 @@ function SidebarNav() {
               if (String(el.style.getPropertyValue(prop)).includes("oklab")) {
                 el.style.removeProperty(prop);
               }
-            }
-          }
-
-          // Remove cores oklab de regras CSS externas no clone
-          for (const sheet of Array.from(clonedDoc.styleSheets)) {
-            try {
-              const rules = Array.from((sheet as CSSStyleSheet).cssRules || []);
-              for (const rule of rules) {
-                const cssRule = rule as CSSStyleRule;
-                if (cssRule.style && String(cssRule.style.cssText).includes("oklab")) {
-                  cssRule.style.cssText = String(cssRule.style.cssText).replace(/oklab\([^)]*\)/g, "");
-                }
-              }
-            } catch {
-              // cross-origin sheet: ignora
             }
           }
         },
