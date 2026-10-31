@@ -49,7 +49,7 @@ import { resetPlayers } from "../lib/scout-api";
 
 function NotFoundComponent() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#F7F8F6] px-4">
+    <div className="flex min-h-screen items-center justify-center bg-canvas px-4">
       <div className="max-w-md text-center">
         <h1 className="text-7xl font-bold text-foreground">404</h1>
         <h2 className="mt-4 text-xl font-semibold text-foreground">Página não encontrada</h2>
@@ -77,7 +77,7 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   }, [error]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#F7F8F6] px-4">
+    <div className="flex min-h-screen items-center justify-center bg-canvas px-4">
       <div className="max-w-md text-center">
         <h1 className="text-xl font-semibold tracking-tight text-foreground">
           Esta página não carregou
@@ -97,7 +97,7 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
           </button>
           <a
             href="/"
-            className="inline-flex items-center justify-center rounded-md border border-input bg-white px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+            className="inline-flex items-center justify-center rounded-md border border-input bg-surface px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
           >
             Ir para início
           </a>
@@ -126,7 +126,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
         rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap",
+        href: "https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap",
       },
       { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
     ],
@@ -200,10 +200,8 @@ function SidebarNav() {
         return;
       }
 
-      // Espera fontes carregarem (como no projeto de referência)
       await document.fonts.ready;
 
-      // Remove cores oklab de estilos inline no documento original
       const stripOklab = (doc: Document) => {
         const walker = doc.createTreeWalker(doc, NodeFilter.SHOW_ELEMENT);
         let n: Node | null;
@@ -237,7 +235,7 @@ function SidebarNav() {
       const { toPng } = await import("html-to-image");
 
       const dataUrl = await toPng(element as HTMLElement, {
-        backgroundColor: "#F7F8F6",
+        backgroundColor: "#f2f2ef",
         cacheBust: true,
         canvasHeight: element.scrollHeight * 2,
         canvasWidth: element.scrollWidth * 2,
@@ -266,15 +264,15 @@ function SidebarNav() {
 
   return (
     <>
-      <aside className="fixed left-0 top-0 z-30 flex h-screen w-[260px] flex-col bg-[#0F1015] text-[#D1D5DB]">
-        <div className="flex h-16 items-center gap-2.5 px-6">
-          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-white text-sm font-bold text-[#0F1015]">
+      <aside className="fixed left-0 top-0 z-30 flex h-screen flex-col bg-[#171b22] text-[#d7dcd9] w-[230px] p-[24px_16px_18px]">
+        <div className="flex items-center gap-[11px] font-sans text-[16px] font-semibold mb-[38px] mx-[8px]">
+          <div className="flex h-[30px] w-[30px] items-center justify-center bg-[#fff] text-[#171b22] text-[11px] font-mono font-medium">
             SB
           </div>
-          <span className="text-base font-semibold text-white">Scoutboard</span>
+          <span>Scoutboard</span>
         </div>
 
-        <nav className="flex-1 space-y-1 px-3 py-4">
+        <nav className="flex-1 space-y-[3px]">
           {navItems.map((item) => {
             const isActive = item.exact ? pathname === item.to : pathname.startsWith(item.to);
             const Icon = item.icon;
@@ -282,105 +280,61 @@ function SidebarNav() {
               <Link
                 key={item.to}
                 to={item.to}
-                className={`relative flex items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors ${
+                className={`relative flex items-center gap-[13px] rounded-none border-l-[2px] border-transparent px-[12px] py-[11px] text-xs font-medium text-[#9197a1] transition-colors ${
                   isActive
-                    ? "bg-[#16181D] text-white"
-                    : "text-[#9CA3AF] hover:bg-[#16181D] hover:text-white"
+                    ? "bg-[#222832] text-white border-l-[#6c8cff]"
+                    : "hover:bg-transparent hover:text-white"
                 }`}
               >
                 {isActive && (
-                  <div className="absolute left-0 top-1/2 h-5 w-[2px] -translate-y-1/2 bg-[#3458D4]" />
+                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-[6px] bg-[#6c8cff]" />
                 )}
                 <Icon className="h-4 w-4" />
                 <span className="flex-1">{item.label}</span>
                 {item.badge && (
-                  <span className="text-xs tabular-nums text-[#6B7280]">{item.badge}</span>
+                  <span className="ml-auto flex h-[16px] w-[16px] items-center justify-center rounded-[12px] bg-[#292e37] text-[10px] font-mono text-white">
+                    {item.badge}
+                  </span>
                 )}
               </Link>
             );
           })}
         </nav>
 
-        <div className="space-y-3 p-3">
-          <div className="rounded-lg border border-[#1F2127] bg-[#16181D] p-3">
-            <div className="flex items-center gap-2.5">
-              <div className="flex h-8 w-8 items-center justify-center rounded-md bg-[#1F2127]">
-                <Database className="h-4 w-4 text-[#9CA3AF]" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium text-white truncate">Base FM 2026</p>
-                <p className="text-[11px] text-[#6B7280]">Atualizada hoje</p>
-              </div>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-6 w-6 text-[#6B7280] hover:text-white">
-                    <MoreHorizontal className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-40">
-                  <DropdownMenuItem onClick={() => setResetDialogOpen(true)} className="text-xs">
-                    <RotateCcw className="mr-2 h-3.5 w-3.5" />
-                    Resetar planilha
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
+        <div className="mt-auto flex items-center gap-[10px] border-t border-[#2a3530] pt-[18px] px-[7px]">
+          <div className="flex h-[31px] w-[31px] items-center justify-center rounded-full bg-[#262c35] text-[11px] font-medium text-white">
+            MA
           </div>
-
-          <div className="flex items-center gap-2.5 rounded-md px-2 py-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-[#3458D4]/20 text-xs font-medium text-[#3458D4]">
-              HS
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium text-white truncate">Head Scout</p>
-              <p className="text-[11px] text-[#6B7280]">Scout</p>
-            </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-medium text-[#edf0ee] truncate">Marcos Almeida</p>
+            <p className="text-[10px] text-[#7f8c86]">Head Scout</p>
           </div>
         </div>
       </aside>
 
-      <AlertDialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Resetar planilha</AlertDialogTitle>
-            <AlertDialogDescription>
-              Isso irá apagar todos os jogadores e datasets importados. Os perfis de posição serão mantidos.
-              Esta ação não pode ser desfeita.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleReset} disabled={resetting}>
-              {resetting ? "Resetando..." : "Resetar"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <header className="fixed left-[260px] right-0 top-0 z-20 flex h-16 items-center justify-between border-b border-[#E5E7EB] bg-white px-6">
-        <div className="font-mono text-[11px] uppercase tracking-wider text-[#6B7280]">
+      <header className="fixed left-[230px] right-0 top-0 z-20 flex h-[64px] items-center justify-between border-b border-[#e1e4df] bg-[#f2f2ef]/0.94 backdrop-blur-[14px] px-[32px]">
+        <div className="font-mono text-[10px] uppercase tracking-[0.8px] text-[#6f7379]">
           {getBreadcrumb()}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-[10px]">
           <Button
             variant="outline"
             size="sm"
-            className="h-9 gap-2"
+            className="h-[38px] w-[38px] gap-2 rounded-none"
             disabled={capturing}
             onClick={handleCapture}
           >
             <Camera className="h-4 w-4" />
-            {capturing ? "Salvando..." : "Salvar tela"}
           </Button>
-          <Button variant="ghost" size="icon" className="h-9 w-9 text-[#6B7280]">
+          <Button variant="ghost" size="icon" className="h-[38px] w-[38px] rounded-none text-[#68716c] hover:bg-transparent">
             <Search className="h-4 w-4" />
           </Button>
           <Button
             size="sm"
-            className="h-9 gap-2 bg-[#3458D4] text-white hover:bg-[#2A4BC4]"
+            className="h-[38px] gap-2 bg-[#3155c6] text-white hover:bg-[#2f4da8] rounded-none px-[14px] font-[600] text-[12px]"
           >
             <Upload className="h-4 w-4" />
-            Importar planilha
+            <span>Importar planilha</span>
           </Button>
         </div>
       </header>
@@ -393,9 +347,9 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <div className="min-h-screen bg-[#F7F8F6]">
+      <div className="min-h-screen bg-canvas">
         <SidebarNav />
-        <main className="ml-[260px] mt-16 min-h-[calc(100vh-64px)] bg-[#F7F8F6]">
+        <main className="ml-[230px] mt-[64px] min-h-[calc(100vh-64px)] bg-canvas">
           <Outlet />
         </main>
       </div>
