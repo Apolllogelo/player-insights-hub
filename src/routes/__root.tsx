@@ -200,31 +200,33 @@ function SidebarNav() {
         return;
       }
 
-      const { toPng } = await import("html-to-image");
+      const html2canvas = (await import("html2canvas")).default;
+      const canvas = await html2canvas(element as HTMLElement, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: "#F7F8F6",
+        scrollX: 0,
+        scrollY: 0,
+        ignoreElements: (el) => {
+          return (
+            el.classList?.contains("toaster") ||
+            el.getAttribute("role") === "status" ||
+            el.getAttribute("data-sonner-toaster") === "true"
+          );
+        },
+        onclone: (clonedDoc: Document) => {
+          const el = clonedDoc.querySelector("main");
+          if (el) {
+            el.style.margin = "0";
+            el.style.padding = "24px";
+            el.style.backgroundColor = "#F7F8F6";
+            el.style.minHeight = "100vh";
+          }
+        },
+      });
 
-      let dataUrl: string;
-      try {
-        dataUrl = await toPng(element as HTMLElement, {
-          quality: 0.95,
-          pixelRatio: 2,
-          backgroundColor: "#F7F8F6",
-          style: {
-            margin: "0",
-          },
-        });
-      } catch {
-        // Fallback: se falhar por restrição CORS de fontes externas, tentar com skipFonts
-        dataUrl = await toPng(element as HTMLElement, {
-          quality: 0.95,
-          pixelRatio: 2,
-          backgroundColor: "#F7F8F6",
-          style: {
-            margin: "0",
-          },
-          skipFonts: true,
-        });
-      }
-
+      const dataUrl = canvas.toDataURL("image/png");
       const link = document.createElement("a");
       const timestamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
       link.download = `scoutboard-${timestamp}.png`;
@@ -373,7 +375,7 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       <div className="min-h-screen bg-[#F7F8F6]">
         <SidebarNav />
-        <main className="ml-[260px] mt-16 min-h-[calc(100vh-64px)]">
+        <main className="ml-[260px] mt-16 min-h-[calc(100vh-64px)] bg-[#F7F8F6]">
           <Outlet />
         </main>
       </div>
