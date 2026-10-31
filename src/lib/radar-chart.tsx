@@ -11,7 +11,7 @@ type RadarChartProps = {
 
 const defaultLabels = ["Reflexo", "1×1", "Jogo aéreo", "Reposição", "Posicionamento", "Defesas"];
 
-function RadarChart({ values, labels = defaultLabels, size = 240, color = "#3155c6" }: RadarChartProps) {
+function RadarChart({ values, labels = defaultLabels, size = 240, color = "var(--primary)" }: RadarChartProps) {
   const center = size / 2;
   const radius = (size / 2) * 0.68;
   const rings = [0.25, 0.5, 0.75, 1];
@@ -29,7 +29,7 @@ function RadarChart({ values, labels = defaultLabels, size = 240, color = "#3155
           key={ring}
           className="radar-ring"
           fill="none"
-          stroke="#e2e6e2"
+          stroke="var(--border)"
           strokeWidth="0.8"
           points={values.map((_, index) => point(index, ring * 100).join(",")).join(" ")}
         />
@@ -44,14 +44,14 @@ function RadarChart({ values, labels = defaultLabels, size = 240, color = "#3155
             y1={center}
             x2={x2}
             y2={y2}
-            stroke="#edf0ed"
+            stroke="var(--muted)"
             strokeWidth="0.8"
           />
         );
       })}
       <polygon
         className="radar-shape"
-        fill={`rgba(${color === "#3155c6" ? "49, 85, 198" : "209, 171, 59"}, 0.2)`}
+        fill="rgba(47, 75, 192, 0.2)"
         stroke={color}
         strokeWidth="1.7"
         points={values.map((value, index) => point(index, value).join(",")).join(" ")}
@@ -59,7 +59,7 @@ function RadarChart({ values, labels = defaultLabels, size = 240, color = "#3155
       {values.map((value, index) => {
         const [cx, cy] = point(index, value);
         return (
-          <circle key={index} className="radar-dot" cx={cx} cy={cy} r="3" fill={color} stroke="#fff" strokeWidth="1.5" />
+          <circle key={index} className="radar-dot" cx={cx} cy={cy} r="3" fill={color} stroke="var(--surface)" strokeWidth="1.5" />
         );
       })}
       {labels.map((label, index) => {
@@ -72,7 +72,7 @@ function RadarChart({ values, labels = defaultLabels, size = 240, color = "#3155
             y={y}
             dominantBaseline="middle"
             textAnchor="middle"
-            fill="#8a938e"
+            fill="var(--muted-foreground)"
             fontFamily="'IBM Plex Sans', sans-serif"
             fontSize={7}
           >

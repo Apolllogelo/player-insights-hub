@@ -235,7 +235,7 @@ function SidebarNav() {
       const { toPng } = await import("html-to-image");
 
       const dataUrl = await toPng(element as HTMLElement, {
-        backgroundColor: "#f2f2ef",
+        backgroundColor: "#F3F2EE",
         cacheBust: true,
         canvasHeight: element.scrollHeight * 2,
         canvasWidth: element.scrollWidth * 2,
@@ -264,9 +264,9 @@ function SidebarNav() {
 
   return (
     <>
-      <aside className="fixed left-0 top-0 z-30 flex h-screen flex-col bg-[#171b22] text-[#d7dcd9] w-[230px] p-[24px_16px_18px]">
+        <aside className="fixed left-0 top-0 z-30 flex h-screen flex-col bg-sidebar text-sidebar-foreground w-[230px] p-[24px_16px_18px]">
         <div className="flex items-center gap-[11px] font-sans text-[16px] font-semibold mb-[38px] mx-[8px]">
-          <div className="flex h-[30px] w-[30px] items-center justify-center bg-[#fff] text-[#171b22] text-[11px] font-mono font-medium">
+          <div className="flex h-[30px] w-[30px] items-center justify-center bg-surface text-sidebar text-[11px] font-mono font-medium">
             SB
           </div>
           <span>Scoutboard</span>
@@ -280,19 +280,19 @@ function SidebarNav() {
               <Link
                 key={item.to}
                 to={item.to}
-                className={`relative flex items-center gap-[13px] rounded-none border-l-[2px] border-transparent px-[12px] py-[11px] text-xs font-medium text-[#9197a1] transition-colors ${
+                className={`relative flex items-center gap-[13px] rounded-none border-l-[2px] border-transparent px-[12px] py-[11px] text-xs font-medium text-muted-foreground transition-colors ${
                   isActive
-                    ? "bg-[#222832] text-white border-l-[#6c8cff]"
+                    ? "bg-sidebar-accent text-white border-l-primary"
                     : "hover:bg-transparent hover:text-white"
                 }`}
               >
                 {isActive && (
-                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-[6px] bg-[#6c8cff]" />
+                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-[6px] bg-primary" />
                 )}
                 <Icon className="h-4 w-4" />
                 <span className="flex-1">{item.label}</span>
                 {item.badge && (
-                  <span className="ml-auto flex h-[16px] w-[16px] items-center justify-center rounded-[12px] bg-[#292e37] text-[10px] font-mono text-white">
+                  <span className="ml-auto flex h-[16px] w-[16px] items-center justify-center rounded-[12px] bg-sidebar-accent text-[10px] font-mono text-white">
                     {item.badge}
                   </span>
                 )}
@@ -301,19 +301,19 @@ function SidebarNav() {
           })}
         </nav>
 
-        <div className="mt-auto flex items-center gap-[10px] border-t border-[#2a3530] pt-[18px] px-[7px]">
-          <div className="flex h-[31px] w-[31px] items-center justify-center rounded-full bg-[#262c35] text-[11px] font-medium text-white">
+        <div className="mt-auto flex items-center gap-[10px] border-t border-sidebar-border pt-[18px] px-[7px]">
+          <div className="flex h-[31px] w-[31px] items-center justify-center rounded-full bg-sidebar-accent text-[11px] font-medium text-sidebar-foreground">
             MA
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-medium text-[#edf0ee] truncate">Marcos Almeida</p>
-            <p className="text-[10px] text-[#7f8c86]">Head Scout</p>
+            <p className="text-xs font-medium text-sidebar-foreground truncate">Marcos Almeida</p>
+            <p className="text-[10px] text-muted-foreground">Head Scout</p>
           </div>
         </div>
       </aside>
 
-      <header className="fixed left-[230px] right-0 top-0 z-20 flex h-[64px] items-center justify-between border-b border-[#e1e4df] bg-[#f2f2ef]/0.94 backdrop-blur-[14px] px-[32px]">
-        <div className="font-mono text-[10px] uppercase tracking-[0.8px] text-[#6f7379]">
+      <header className="fixed left-[230px] right-0 top-0 z-20 flex h-[64px] items-center justify-between border-b border-border bg-background/0.94 backdrop-blur-[14px] px-[32px]">
+        <div className="font-mono text-[10px] uppercase tracking-[0.8px] text-muted-foreground">
           {getBreadcrumb()}
         </div>
         <div className="flex items-center gap-[10px]">
@@ -326,12 +326,12 @@ function SidebarNav() {
           >
             <Camera className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="icon" className="h-[38px] w-[38px] rounded-none text-[#68716c] hover:bg-transparent">
+          <Button variant="ghost" size="icon" className="h-[38px] w-[38px] rounded-none text-muted-foreground hover:bg-transparent">
             <Search className="h-4 w-4" />
           </Button>
           <Button
             size="sm"
-            className="h-[38px] gap-2 bg-[#3155c6] text-white hover:bg-[#2f4da8] rounded-none px-[14px] font-[600] text-[12px]"
+            className="h-[38px] gap-2 bg-primary text-white hover:bg-primary/90 rounded-none px-[14px] font-[600] text-[12px]"
           >
             <Upload className="h-4 w-4" />
             <span>Importar planilha</span>
