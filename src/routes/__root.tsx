@@ -1,4 +1,4 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+﻿import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   Outlet,
   Link,
@@ -8,7 +8,7 @@ import {
   Scripts,
   useLocation,
 } from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   LayoutDashboard,
   Users,
@@ -19,13 +19,34 @@ import {
   Search,
   Upload,
   MoreHorizontal,
+  RotateCcw,
+  Camera,
 } from "lucide-react";
+import html2canvas from "html2canvas";
+import { toast } from "sonner";
 
 import appCss from "../styles.css?url";
 import { Toaster } from "@/components/ui/sonner";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { resetPlayers } from "../lib/scout-api";
 
 function NotFoundComponent() {
   return (
@@ -134,6 +155,9 @@ function RootShell({ children }: { children: ReactNode }) {
 function SidebarNav() {
   const location = useLocation();
   const pathname = location.pathname;
+  const router = useRouter();
+  const [resetDialogOpen, setResetDialogOpen] = useState(false);
+  const [resetting, setResetting] = useState(false);
 
   const navItems = [
     { to: "/", icon: LayoutDashboard, label: "Visão geral", exact: true },
@@ -150,6 +174,20 @@ function SidebarNav() {
     if (pathname.startsWith("/planejador")) return "Scoutboard / Planejador";
     return "Scoutboard / Visão geral";
   };
+
+  async function handleReset() {
+    setResetting(true);
+    try {
+      await resetPlayers();
+      toast.success("Planilha resetada com sucesso.");
+      router.invalidate();
+      setResetDialogOpen(false);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao resetar planilha.");
+    } finally {
+      setResetting(false);
+    }
+  }
 
   return (
     <>
@@ -198,9 +236,19 @@ function SidebarNav() {
                 <p className="text-xs font-medium text-white truncate">Base FM 2026</p>
                 <p className="text-[11px] text-[#6B7280]">Atualizada hoje</p>
               </div>
-              <Button variant="ghost" size="icon" className="h-6 w-6 text-[#6B7280] hover:text-white">
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-6 w-6 text-[#6B7280] hover:text-white">
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-40">
+                  <DropdownMenuItem onClick={() => setResetDialogOpen(true)} className="text-xs">
+                    <RotateCcw className="mr-2 h-3.5 w-3.5" />
+                    Resetar planilha
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
 
@@ -216,11 +264,58 @@ function SidebarNav() {
         </div>
       </aside>
 
+      <AlertDialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Resetar planilha</AlertDialogTitle>
+            <AlertDialogDescription>
+              Isso irá apagar todos os jogadores e datasets importados. Os perfis de posição serão mantidos.
+              Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleReset} disabled={resetting}>
+              {resetting ? "Resetando..." : "Resetar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <header className="fixed left-[260px] right-0 top-0 z-20 flex h-16 items-center justify-between border-b border-[#E5E7EB] bg-white px-6">
         <div className="font-mono text-[11px] uppercase tracking-wider text-[#6B7280]">
           {getBreadcrumb()}
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-9 gap-2"
+            onClick={async () => {
+              try {
+                const element = document.querySelector("main");
+                if (!element) {
+                  toast.error("Não foi possível capturar a tela.");
+                  return;
+                }
+                const canvas = await html2canvas(element as HTMLElement, {
+                  scale: 2,
+                  useCORS: true,
+                  logging: false,
+                });
+                const link = document.createElement("a");
+                link.download = `scoutboard-${Date.now()}.png`;
+                link.href = canvas.toDataURL("image/png");
+                link.click();
+                toast.success("Screenshot salva.");
+              } catch (e) {
+                toast.error("Falha ao salvar screenshot.");
+              }
+            }}
+          >
+            <Camera className="h-4 w-4" />
+            Salvar tela
+          </Button>
           <Button variant="ghost" size="icon" className="h-9 w-9 text-[#6B7280]">
             <Search className="h-4 w-4" />
           </Button>
