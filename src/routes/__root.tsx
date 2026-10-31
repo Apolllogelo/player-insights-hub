@@ -22,7 +22,6 @@ import {
   RotateCcw,
   Camera,
 } from "lucide-react";
-import html2canvas from "html2canvas";
 import { toast } from "sonner";
 
 import appCss from "../styles.css?url";
@@ -158,6 +157,7 @@ function SidebarNav() {
   const router = useRouter();
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
   const [resetting, setResetting] = useState(false);
+  const [capturing, setCapturing] = useState(false);
 
   const navItems = [
     { to: "/", icon: LayoutDashboard, label: "Visão geral", exact: true },
@@ -186,6 +186,59 @@ function SidebarNav() {
       toast.error(e instanceof Error ? e.message : "Falha ao resetar planilha.");
     } finally {
       setResetting(false);
+    }
+  }
+
+  async function handleCapture() {
+    if (capturing) return;
+    setCapturing(true);
+    const toastId = toast.loading("Capturando tela...");
+    try {
+      const element = document.querySelector("main");
+      if (!element) {
+        toast.error("Não foi possível encontrar a área principal para captura.", { id: toastId });
+        return;
+      }
+
+      const { toPng } = await import("html-to-image");
+
+      let dataUrl: string;
+      try {
+        dataUrl = await toPng(element as HTMLElement, {
+          quality: 0.95,
+          pixelRatio: 2,
+          backgroundColor: "#F7F8F6",
+          style: {
+            margin: "0",
+          },
+        });
+      } catch {
+        // Fallback: se falhar por restrição CORS de fontes externas, tentar com skipFonts
+        dataUrl = await toPng(element as HTMLElement, {
+          quality: 0.95,
+          pixelRatio: 2,
+          backgroundColor: "#F7F8F6",
+          style: {
+            margin: "0",
+          },
+          skipFonts: true,
+        });
+      }
+
+      const link = document.createElement("a");
+      const timestamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+      link.download = `scoutboard-${timestamp}.png`;
+      link.href = dataUrl;
+      link.click();
+      toast.success("Screenshot salva com sucesso!", { id: toastId });
+    } catch (e) {
+      console.error("Falha ao salvar screenshot:", e);
+      toast.error(
+        e instanceof Error ? `Falha ao salvar screenshot: ${e.message}` : "Falha ao salvar screenshot.",
+        { id: toastId },
+      );
+    } finally {
+      setCapturing(false);
     }
   }
 
@@ -291,30 +344,11 @@ function SidebarNav() {
             variant="outline"
             size="sm"
             className="h-9 gap-2"
-            onClick={async () => {
-              try {
-                const element = document.querySelector("main");
-                if (!element) {
-                  toast.error("Não foi possível capturar a tela.");
-                  return;
-                }
-                const canvas = await html2canvas(element as HTMLElement, {
-                  scale: 2,
-                  useCORS: true,
-                  logging: false,
-                });
-                const link = document.createElement("a");
-                link.download = `scoutboard-${Date.now()}.png`;
-                link.href = canvas.toDataURL("image/png");
-                link.click();
-                toast.success("Screenshot salva.");
-              } catch (e) {
-                toast.error("Falha ao salvar screenshot.");
-              }
-            }}
+            disabled={capturing}
+            onClick={handleCapture}
           >
             <Camera className="h-4 w-4" />
-            Salvar tela
+            {capturing ? "Salvando..." : "Salvar tela"}
           </Button>
           <Button variant="ghost" size="icon" className="h-9 w-9 text-[#6B7280]">
             <Search className="h-4 w-4" />
