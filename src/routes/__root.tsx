@@ -194,6 +194,7 @@ function SidebarNav() {
     if (capturing) return;
     setCapturing(true);
     const toastId = toast.loading("Capturando tela...");
+    let originalGetComputedStyle: () => CSSStyleDeclaration;
     try {
       const element = document.querySelector("main");
       if (!element) {
@@ -201,35 +202,23 @@ function SidebarNav() {
         return;
       }
 
-      // html2canvas não suporta cores oklab; remove-as do documento original ANTES de capturar
-      function stripOklab(doc: Document) {
-        const walker = doc.createTreeWalker(doc, NodeFilter.SHOW_ELEMENT);
-        let n: Node | null;
-        while ((n = walker.nextNode())) {
-          const el = n as HTMLElement;
-          for (const prop of Object.keys(el.style)) {
-            if (String(el.style.getPropertyValue(prop)).includes("oklab")) {
-              el.style.removeProperty(prop);
+      // html2canvas lê getComputedStyle, que pode retornar oklab; intercepta e filtra antes de capturar
+      originalGetComputedStyle = window.getComputedStyle.bind(window);
+      window.getComputedStyle = (el: Element, pseudoElt?: string | null) => {
+        const computed = originalGetComputedStyle(el, pseudoElt);
+        return new Proxy(computed, {
+          get(target: CSSStyleDeclaration, prop: string | symbol) {
+            const value = target[prop as keyof CSSStyleDeclaration];
+            if (typeof value === "string" && value.includes("oklab")) {
+              return value.replace(/oklab\([^)]*\)/g, "rgb(247, 248, 246)");
             }
-          }
-        }
-        for (const sheet of Array.from(doc.styleSheets)) {
-          try {
-            const rules = Array.from((sheet as CSSStyleSheet).cssRules || []);
-            for (const rule of rules) {
-              const cssRule = rule as CSSStyleRule;
-              if (cssRule.style && String(cssRule.style.cssText).includes("oklab")) {
-                cssRule.style.cssText = String(cssRule.style.cssText).replace(/oklab\([^)]*\)/g, "");
-              }
-            }
-          } catch {
-            // cross-origin sheet: ignora
-          }
-        }
-      }
-      stripOklab(document);
+            return value;
+          },
+        }) as unknown as CSSStyleDeclaration;
+      };
 
-      const canvas = await html2canvas(element as HTMLElement, {
+      try {
+        const canvas = await html2canvas(element as HTMLElement, {
         scale: 2,
         useCORS: true,
         logging: false,
@@ -280,6 +269,7 @@ function SidebarNav() {
         { id: toastId },
       );
     } finally {
+      window.getComputedStyle = originalGetComputedStyle;
       setCapturing(false);
     }
   }
