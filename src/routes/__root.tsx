@@ -194,7 +194,6 @@ function SidebarNav() {
     if (capturing) return;
     setCapturing(true);
     const toastId = toast.loading("Capturando tela...");
-    let originalGetComputedStyle = window.getComputedStyle.bind(window);
     try {
       const element = document.querySelector("main");
       if (!element) {
@@ -202,19 +201,32 @@ function SidebarNav() {
         return;
       }
 
-      // html2canvas lê getComputedStyle, que pode retornar oklab; intercepta e filtra antes de capturar
-      window.getComputedStyle = ((el: Element, pseudoElt?: string | null) => {
-        const computed = originalGetComputedStyle(el, pseudoElt);
-        return new Proxy(computed, {
-          get(target: any, prop: string | symbol) {
-            const value = target[prop];
-            if (typeof value === "string" && value.includes("oklab")) {
-              return value.replace(/oklab\([^)]*\)/g, "rgb(247, 248, 246)");
+      // Remove cores oklab de estilos inline no documento original
+      const walker = document.createTreeWalker(document, NodeFilter.SHOW_ELEMENT);
+      let n: Node | null;
+      while ((n = walker.nextNode())) {
+        const el = n as HTMLElement;
+        for (const prop of Object.keys(el.style)) {
+          if (String(el.style.getPropertyValue(prop)).includes("oklab")) {
+            el.style.removeProperty(prop);
+          }
+        }
+      }
+
+      // Remove cores oklab de regras CSS externas
+      for (const sheet of Array.from(document.styleSheets)) {
+        try {
+          const rules = Array.from((sheet as CSSStyleSheet).cssRules || []);
+          for (const rule of rules) {
+            const cssRule = rule as CSSStyleRule;
+            if (cssRule.style && String(cssRule.style.cssText).includes("oklab")) {
+              cssRule.style.cssText = String(cssRule.style.cssText).replace(/oklab\([^)]*\)/g, "");
             }
-            return value;
-          },
-        }) as unknown as CSSStyleDeclaration;
-      }) as typeof window.getComputedStyle;
+          }
+        } catch {
+          // cross-origin sheet: ignora
+        }
+      }
 
       const canvas = await html2canvas(element as HTMLElement, {
         scale: 2,
@@ -240,9 +252,9 @@ function SidebarNav() {
           }
 
           // Backup: remove cores oklab de estilos inline no clone
-          const walker = clonedDoc.createTreeWalker(clonedDoc, NodeFilter.SHOW_ELEMENT);
+          const w = clonedDoc.createTreeWalker(clonedDoc, NodeFilter.SHOW_ELEMENT);
           let node: Node | null;
-          while ((node = walker.nextNode())) {
+          while ((node = w.nextNode())) {
             const el = node as HTMLElement;
             for (const prop of Object.keys(el.style)) {
               if (String(el.style.getPropertyValue(prop)).includes("oklab")) {
@@ -267,7 +279,6 @@ function SidebarNav() {
         { id: toastId },
       );
     } finally {
-      window.getComputedStyle = originalGetComputedStyle;
       setCapturing(false);
     }
   }
