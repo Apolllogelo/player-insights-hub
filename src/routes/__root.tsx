@@ -23,6 +23,7 @@ import {
   Camera,
 } from "lucide-react";
 import { toast } from "sonner";
+import html2canvas from "html2canvas";
 
 import appCss from "../styles.css?url";
 import { Toaster } from "@/components/ui/sonner";
@@ -200,7 +201,6 @@ function SidebarNav() {
         return;
       }
 
-      const html2canvas = (await import("html2canvas")).default;
       const canvas = await html2canvas(element as HTMLElement, {
         scale: 2,
         useCORS: true,
@@ -222,6 +222,18 @@ function SidebarNav() {
             el.style.padding = "24px";
             el.style.backgroundColor = "#F7F8F6";
             el.style.minHeight = "100vh";
+          }
+
+          // html2canvas não suporta cores oklab; remove-as para evitar erro de parse
+          const walker = clonedDoc.createTreeWalker(clonedDoc, NodeFilter.SHOW_ELEMENT);
+          let node: Node | null;
+          while ((node = walker.nextNode())) {
+            const el = node as HTMLElement;
+            for (const prop of Object.keys(el.style)) {
+              if (String(el.style.getPropertyValue(prop)).includes("oklab")) {
+                el.style.removeProperty(prop);
+              }
+            }
           }
         },
       });
