@@ -111,6 +111,14 @@ function JogadoresPage() {
     return (profiles.data ?? []).find((pr) => pr.player_type === selectedPlayer.player_type);
   }, [selectedPlayer, profiles.data]);
 
+  const selectedRating = useMemo(() => {
+    if (!selectedPlayer) return null;
+    const profile = (profiles.data ?? []).find((pr) => pr.player_type === selectedPlayer.player_type);
+    const ratingCol = profile?.id_map?.rating;
+    if (!ratingCol) return null;
+    return toNumber(selectedPlayer.data[ratingCol]);
+  }, [selectedPlayer, profiles.data]);
+
   const radarData = useMemo(() => {
     if (!selectedPlayer) return [];
     return computeRadarData(selectedPlayer, selectedProfile);
@@ -246,25 +254,20 @@ function JogadoresPage() {
                         <span className="font-mono text-[7px] text-muted-foreground uppercase">Idade</span>
                         <strong className="font-mono text-[10px] text-ink">{p.age ?? "—"}</strong>
                       </div>
-                      <div className="directory-meta flex flex-col gap-[3px]">
-                        <span className="font-mono text-[7px] text-muted-foreground uppercase">Altura</span>
-                        <strong className="font-mono text-[10px] text-ink">{p.height ?? "—"} cm</strong>
-                      </div>
                       <div className="directory-rating flex flex-col gap-[3px]">
                         <span className="font-mono text-[7px] text-muted-foreground uppercase">Nota</span>
                         <strong className="font-mono text-[11px] font-semibold text-primary">
                           {rating !== null ? rating.toFixed(1) : "—"}
                         </strong>
                       </div>
-                      <span className={`rounded-none border-none px-2 py-1 text-[7px] font-mono font-medium ${
-                        status === "Prioridade"
-                          ? "bg-[#FDECE3] text-[#E0663A]"
-                          : status === "Monitorar"
-                            ? "bg-[#EDF4FB] text-[#2F4BC0]"
-                            : status === "Observação"
-                              ? "bg-[#F2F0EC] text-[#6F7379]"
-                              : "text-muted-foreground"
-                      }`} uppercase>{status || "—"}</span>
+                      <span className={`rounded-none border-none px-2 py-1 text-[7px] font-mono font-medium uppercase ${status === "Prioridade"
+                        ? "bg-[#FDECE3] text-[#E0663A]"
+                        : status === "Monitorar"
+                          ? "bg-[#EDF4FB] text-[#2F4BC0]"
+                          : status === "Observação"
+                            ? "bg-[#F2F0EC] text-[#6F7379]"
+                            : "text-muted-foreground"
+                      }`}>{status || "—"}</span>
                       <div className="flex h-4 w-4 items-center justify-center text-muted-foreground">
                         <span className="h-4 w-4">›</span>
                       </div>
@@ -310,7 +313,7 @@ function JogadoresPage() {
             <div className="preview-score grid grid-cols-3 gap-[4px] mb-[10px]">
               <div className="flex flex-col">
                 <span className="font-mono text-[7px] text-muted-foreground uppercase">Nota</span>
-                <strong className="font-mono text-[12px] text-ink">{rating !== null ? rating.toFixed(1) : "—"}</strong>
+                <strong className="font-mono text-[12px] text-ink">{selectedRating !== null ? selectedRating.toFixed(1) : "—"}</strong>
               </div>
               <div className="flex flex-col">
                 <span className="font-mono text-[7px] text-muted-foreground uppercase">Potencial</span>

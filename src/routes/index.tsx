@@ -47,7 +47,6 @@ function getStatusBadge(status?: string) {
 function VisaoGeralPage() {
   const players = useQuery(playersQuery);
   const profiles = useQuery(profilesQuery);
-  const datasets = useQuery(datasetsQuery);
 
   const [search, setSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState<"all" | "priority" | "monitor">("all");
@@ -72,7 +71,7 @@ function VisaoGeralPage() {
     return list.slice(0, 50);
   }, [players.data, search, activeFilter]);
 
-  const defaultSelectedId = playerList.length > 0 ? playerList[0].id : null;
+  const defaultSelectedId = playerList.length > 0 ? (playerList[0]?.id ?? null) : null;
   const selectedPlayerIdFinal = selectedPlayerId ?? defaultSelectedId;
 
   const selectedPlayer = useMemo(() => {
@@ -85,6 +84,14 @@ function VisaoGeralPage() {
   const selectedProfile = useMemo(() => {
     if (!selectedPlayer) return null;
     return (profiles.data ?? []).find((pr) => pr.player_type === selectedPlayer.player_type);
+  }, [selectedPlayer, profiles.data]);
+
+  const selectedRating = useMemo(() => {
+    if (!selectedPlayer) return null;
+    const profile = (profiles.data ?? []).find((pr) => pr.player_type === selectedPlayer.player_type);
+    const ratingCol = profile?.id_map?.rating;
+    if (!ratingCol) return null;
+    return toNumber(selectedPlayer.data[ratingCol]);
   }, [selectedPlayer, profiles.data]);
 
   const radarData = useMemo(() => {
@@ -293,7 +300,7 @@ function VisaoGeralPage() {
                         </td>
                         <td className="pl-0 pr-16 w-[56px] text-right">
                           <span className="font-mono text-[12px] font-semibold text-[#2F4BC0]">
-                            {rating !== null ? rating.toFixed(1) : "—"}
+                        {selectedRating !== null ? selectedRating.toFixed(1) : "—"}
                           </span>
                         </td>
                         <td className="pl-0 pr-16 w-[96px] text-right">
@@ -346,7 +353,7 @@ function VisaoGeralPage() {
                     <div className="flex flex-col">
                       <span className="font-mono text-[8px] font-bold text-[#6F7379] uppercase">Nota</span>
                       <strong className="font-mono text-[14px] text-[#15171a]">
-                        {rating !== null ? rating.toFixed(1) : "—"}
+                        {selectedRating !== null ? selectedRating.toFixed(1) : "—"}
                       </strong>
                     </div>
                     <div className="flex flex-col">
