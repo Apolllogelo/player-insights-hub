@@ -9,11 +9,17 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as IndexRouteImport } from './routes/index'
 import { Route as JogadoresRouteImport } from './routes/jogadores'
 import { Route as MapearRouteImport } from './routes/mapear'
 import { Route as PlanejadorRouteImport } from './routes/planejador'
 import { Route as JogadorIdRouteImport } from './routes/jogador.$id'
 
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const JogadoresRoute = JogadoresRouteImport.update({
   id: '/jogadores',
   path: '/jogadores',
@@ -36,12 +42,14 @@ const JogadorIdRoute = JogadorIdRouteImport.update({
 } as any)
 
 export interface FileRoutesByFullPath {
+  '/': typeof IndexRoute
   '/jogadores': typeof JogadoresRoute
   '/mapear': typeof MapearRoute
   '/planejador': typeof PlanejadorRoute
   '/jogador/$id': typeof JogadorIdRoute
 }
 export interface FileRoutesByTo {
+  '/': typeof IndexRoute
   '/jogadores': typeof JogadoresRoute
   '/mapear': typeof MapearRoute
   '/planejador': typeof PlanejadorRoute
@@ -49,6 +57,7 @@ export interface FileRoutesByTo {
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
+  '/': typeof IndexRoute
   '/jogadores': typeof JogadoresRoute
   '/mapear': typeof MapearRoute
   '/planejador': typeof PlanejadorRoute
@@ -56,13 +65,15 @@ export interface FileRoutesById {
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/jogadores' | '/mapear' | '/planejador' | '/jogador/$id'
+  fullPaths: '/' | '/jogadores' | '/mapear' | '/planejador' | '/jogador/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/jogadores' | '/mapear' | '/planejador' | '/jogador/$id'
-  id: '__root__' | '/jogadores' | '/mapear' | '/planejador' | '/jogador/$id'
+  to: '/' | '/jogadores' | '/mapear' | '/planejador' | '/jogador/$id'
+  id:
+    '__root__' | '/' | '/jogadores' | '/mapear' | '/planejador' | '/jogador/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
+  IndexRoute: typeof IndexRoute
   JogadoresRoute: typeof JogadoresRoute
   MapearRoute: typeof MapearRoute
   PlanejadorRoute: typeof PlanejadorRoute
@@ -71,6 +82,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/jogadores': {
       id: '/jogadores'
       path: '/jogadores'
@@ -103,6 +121,7 @@ declare module '@tanstack/react-router' {
 }
 
 const rootRouteChildren: RootRouteChildren = {
+  IndexRoute: IndexRoute,
   JogadoresRoute: JogadoresRoute,
   MapearRoute: MapearRoute,
   PlanejadorRoute: PlanejadorRoute,
