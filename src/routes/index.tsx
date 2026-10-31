@@ -9,6 +9,19 @@ import { playersQuery, profilesQuery } from "@/lib/scout-api";
 import { RadarChartSvg } from "@/lib/radar-chart";
 import { formatValue, toNumber, type PlayerRow, type PositionProfile } from "@/lib/scout-types";
 
+export const Route = createFileRoute("/")({
+  head: () => ({
+    meta: [
+      { title: "Scoutboard — Visão Geral" },
+      {
+        name: "description",
+        content: "Dashboard de scouting com indicadores, jogadores em destaque e relatório dinâmico.",
+      },
+    ],
+  }),
+  component: VisaoGeralPage,
+});
+
 function getInitials(name: string) {
   return name
     .split(" ")
