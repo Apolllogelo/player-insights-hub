@@ -46,15 +46,15 @@ function getAvatarColor(name: string) {
 
 function getStatusBadge(status?: string) {
   if (status === "Prioridade") {
-    return <span className="inline-block rounded-none border-none px-2 py-1 text-[8px] font-mono font-medium bg-[#FCEBE3] text-[#C2501F]">{status}</span>;
+    return <span className="inline-block rounded-none border-none px-2 py-1 text-[11px] font-mono font-medium bg-[#FCEBE3] text-[#C2501F]">{status}</span>;
   }
   if (status === "Monitorar") {
-    return <span className="inline-block rounded-none border-none px-2 py-1 text-[8px] font-mono font-medium bg-[#E8ECFA] text-[#2F4BC0]">{status}</span>;
+    return <span className="inline-block rounded-none border-none px-2 py-1 text-[11px] font-mono font-medium bg-[#E8ECFA] text-[#2F4BC0]">{status}</span>;
   }
   if (status === "Observação") {
-    return <span className="inline-block rounded-none border-none px-2 py-1 text-[8px] font-mono font-medium bg-[#ECECE8] text-[#5A5A55]">{status}</span>;
+    return <span className="inline-block rounded-none border-none px-2 py-1 text-[11px] font-mono font-medium bg-[#ECECE8] text-[#5A5A55]">{status}</span>;
   }
-  return <span className="inline-block rounded-none border-none px-2 py-1 text-[8px] font-mono font-medium text-[#5A5A55]">{status || "—"}</span>;
+  return <span className="inline-block rounded-none border-none px-2 py-1 text-[11px] font-mono font-medium text-[#5A5A55]">{status || "—"}</span>;
 }
 
 function computeStatusFromPotential(potential: number) {
@@ -116,7 +116,7 @@ function VisaoGeralPage() {
     return selectedProfile.metrics.slice(0, 6).map((metric) => {
       const val = toNumber(selectedPlayer.data[metric.column]);
       return {
-        subject: metric.label.length > 12 ? metric.label.slice(0, 12) + "..." : metric.label,
+        subject: metric.label,
         value: val ?? 50,
         fullMark: 100,
       };
@@ -130,6 +130,13 @@ function VisaoGeralPage() {
     if (!ratingCol) return null;
     return toNumber(selectedPlayer.data[ratingCol]);
   }, [selectedPlayer, profiles.data]);
+
+  const selectedPotential = useMemo(() => {
+    if (!selectedPlayer) return 50;
+    const rating = selectedRating;
+    if (rating === null) return 50;
+    return Math.round(rating * 10);
+  }, [selectedRating]);
 
   const totalPlayers = (players.data ?? []).length;
   const priorityCount = (players.data ?? []).filter((p) => (p.data as any)?.status === "Prioridade").length;
@@ -151,9 +158,10 @@ function VisaoGeralPage() {
 
   return (
     <div className="min-h-screen bg-[#F3F2EE] min-w-0 w-full max-w-full overflow-x-hidden">
-      <div className="mx-auto w-full max-w-[1380px] p-[38px_32px_60px] min-w-0 overflow-x-hidden">
+      {/* Wrapper único de largura */}
+      <div className="mx-auto w-full max-w-[1400px] min-w-0 p-[0_32px] box-border overflow-x-hidden">
 
-        {/* KPI Cards - UM container branco com borda, 4 colunas iguais, gap 0 com divisórias 1px */}
+        {/* KPI Cards */}
         <div className="bg-white border-1 border-[#E3E1DA] rounded-[4px] overflow-hidden min-w-0 w-full grid grid-cols-[repeat(4,minmax(0,1fr))] gap-0 mb-24">
           {/* Card 1: Jogadores analisados - fundo navy */}
           <article className="bg-[#161B26] text-white p-[18px_19px_15px] border-r-1 border-[#2A3530] flex flex-col min-h-[142px] min-w-0">
@@ -165,10 +173,10 @@ function VisaoGeralPage() {
               <strong className="font-mono text-[32px] leading-1 block">{totalPlayers}</strong>
             </div>
             <div className="stat-foot flex items-center justify-between text-[#8D949D] text-[9px] font-mono min-w-0">
-              <div className="avatar-stack flex min-w-0">
-                <span className="flex h-[24px] w-[24px] items-center justify-center rounded-[2px] bg-[#2A3142] text-white text-[12px] font-mono shrink-0">BA</span>
-                <span className="flex h-[24px] w-[24px] items-center justify-center rounded-[2px] bg-[#2A3142] text-white text-[12px] font-mono shrink-0 ml-[-8px]">IS</span>
-                <span className="flex h-[24px] w-[24px] items-center justify-center rounded-[2px] bg-[#2A3142] text-white text-[12px] font-mono shrink-0 ml-[-8px]">JM</span>
+              <div className="avatar-stack flex min-w-0 shrink-0">
+                <span className="flex h-[24px] w-[24px] items-center justify-center rounded-full bg-[#2A3142] border-[2px] border-[#161B26] text-white text-[10px] font-mono shrink-0 ml-[0px]">BA</span>
+                <span className="flex h-[24px] w-[24px] items-center justify-center rounded-full bg-[#2A3142] border-[2px] border-[#161B26] text-white text-[10px] font-mono shrink-0 ml-[-6px]">IS</span>
+                <span className="flex h-[24px] w-[24px] items-center justify-center rounded-full bg-[#2A3142] border-[2px] border-[#161B26] text-white text-[10px] font-mono shrink-0 ml-[-6px]">JM</span>
               </div>
               <span className="shrink-0">+{Math.min(totalPlayers, 23)} este mês</span>
             </div>
@@ -221,7 +229,7 @@ function VisaoGeralPage() {
             <div className="mt-[17px] mb-auto min-w-0">
               <strong className="font-mono text-[32px] leading-1 text-[#15171a] block">{averageRating}</strong>
             </div>
-            <div className="mt-auto w-full min-w-0">
+            <div className="mt-auto w-full min-w-0 shrink-0">
               <svg className="w-full h-[28px] shrink-0" viewBox="0 0 120 28" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <polyline points="2,22 12,10 22,26 32,8 42,18 52,14 62,20 72,12 82,24 92,16 102,20 112,10" stroke="#2F4BC0" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
@@ -229,16 +237,14 @@ function VisaoGeralPage() {
           </article>
         </div>
 
-        {/* Lista + Relatório lado a lado */}
-        <div className="grid grid-cols-[minmax(0,1.4fr)_minmax(320px,0.6fr)] gap-16 items-start min-w-0 w-full max-w-full overflow-x-hidden">
+        {/* Lista + Relatório lado a lado, mesmo wrapper */}
+        <div className="grid grid-cols-[minmax(0,1fr)_380px] gap-16 items-start min-w-0 w-full max-w-full overflow-x-hidden">
           <style>{`
-            @media (max-width: 1099px) {
-              .overview-grid {
-                grid-template-columns: minmax(0, 1fr) !important;
-              }
+            @media (max-width: 1023px) {
+              .overview-layout { grid-template-columns: minmax(0, 1fr) !important; }
             }
           `}</style>
-          <div className="overview-grid w-full min-w-0 overflow-x-hidden">
+          <div className="overview-layout min-w-0 w-full overflow-x-hidden">
 
             {/* Coluna esquerda: UM card branco com lista */}
             <div className="bg-white border-1 border-[#E3E1DA] rounded-[4px] overflow-hidden flex flex-col min-w-0 w-full">
@@ -298,123 +304,122 @@ function VisaoGeralPage() {
                 </div>
               </div>
 
-              {/* Tabela - display grid para alinhamento exato de colunas */}
+              {/* Tabela - sem overflow-x horizontal */}
               <div className="flex-1 min-h-0 overflow-hidden min-w-0">
-                <div className="w-full overflow-x-auto min-w-0">
-                  <table className="border-collapse w-full text-left min-w-0">
-                    <thead>
-                      <tr style={{
-                        display: "grid",
-                        gridTemplateColumns: "minmax(0, 1fr) 64px 72px 150px 110px 32px",
-                        columnGap: 16,
-                        alignItems: "center",
-                        width: "100%",
-                      }} className="bg-[#F3F2EE] border-b-1 border-[#E3E1DA]">
-                        <th className="font-mono text-[11px] font-bold text-[#6F7379] uppercase px-[20px] py-[13px] border-b-1 border-[#E3E1DA]">JOGADOR</th>
-                        <th className="font-mono text-[11px] font-bold text-[#6F7379] uppercase px-[20px] py-[13px] border-b-1 border-[#E3E1DA] text-right">IDADE</th>
-                        <th className="font-mono text-[11px] font-bold text-[#6F7379] uppercase px-[20px] py-[13px] border-b-1 border-[#E3E1DA] text-right">NOTA</th>
-                        <th className="font-mono text-[11px] font-bold text-[#6F7379] uppercase px-[20px] py-[13px] border-b-1 border-[#E3E1DA] text-right">POTENCIAL</th>
-                        <th className="font-mono text-[11px] font-bold text-[#6F7379] uppercase px-[20px] py-[13px] border-b-1 border-[#E3E1DA]">STATUS</th>
-                        <th className="font-mono text-[11px] font-bold text-[#6F7379] uppercase px-[20px] py-[13px] border-b-1 border-[#E3E1DA] text-center"></th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#E3E1DA]">
-                      {playerList.map((p) => {
-                        const profile = (profiles.data ?? []).find((pr) => pr.player_type === p.player_type);
-                        const ratingCol = profile?.id_map?.rating;
-                        const rating = ratingCol ? toNumber(p.data[ratingCol]) : null;
-                        const statusRaw = (p.data as any)?.status;
-                        const potential = rating !== null ? Math.round(rating * 10) : 50;
-                        const status = statusRaw ?? computeStatusFromPotential(potential);
-                        const isSelected = selectedPlayer?.id === p.id;
+                <table className="border-collapse w-full text-left min-w-0">
+                  <thead>
+                    <tr style={{
+                      display: "grid",
+                      gridTemplateColumns: "minmax(0, 1fr) 48px 60px 120px 96px 24px",
+                      columnGap: 12,
+                      alignItems: "center",
+                      width: "100%",
+                    }} className="bg-[#F3F2EE] border-b-1 border-[#E3E1DA]">
+                      <th className="font-mono text-[11px] font-bold text-[#6F7379] uppercase px-[16px] py-[13px] border-b-1 border-[#E3E1DA]">JOGADOR</th>
+                      <th className="font-mono text-[11px] font-bold text-[#6F7379] uppercase px-[16px] py-[13px] border-b-1 border-[#E3E1DA] text-right">IDADE</th>
+                      <th className="font-mono text-[11px] font-bold text-[#6F7379] uppercase px-[16px] py-[13px] border-b-1 border-[#E3E1DA] text-right">NOTA</th>
+                      <th className="font-mono text-[11px] font-bold text-[#6F7379] uppercase px-[16px] py-[13px] border-b-1 border-[#E3E1DA] text-right">POTENCIAL</th>
+                      <th className="font-mono text-[11px] font-bold text-[#6F7379] uppercase px-[16px] py-[13px] border-b-1 border-[#E3E1DA]">STATUS</th>
+                      <th className="font-mono text-[11px] font-bold text-[#6F7379] uppercase px-[16px] py-[13px] border-b-1 border-[#E3E1DA] text-center"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#E3E1DA] [max-height:560px] overflow-y-auto">
+                    {playerList.map((p) => {
+                      const profile = (profiles.data ?? []).find((pr) => pr.player_type === p.player_type);
+                      const ratingCol = profile?.id_map?.rating;
+                      const rating = ratingCol ? toNumber(p.data[ratingCol]) : null;
+                      const statusRaw = (p.data as any)?.status;
+                      const potential = rating !== null ? Math.round(rating * 10) : 50;
+                      const status = statusRaw ?? computeStatusFromPotential(potential);
+                      const isSelected = selectedPlayer?.id === p.id;
 
-                        return (
-                          <button
-                            key={p.id}
-                            onClick={() => setSelectedPlayerId(p.id)}
-                            style={{
-                              display: "grid",
-                              gridTemplateColumns: "minmax(0, 1fr) 64px 72px 150px 110px 32px",
-                              columnGap: 16,
-                              alignItems: "center",
-                              width: "100%",
-                            }}
-                            className={`px-[20px] py-[13px] text-left transition-colors border-b-0 h-[64px] min-w-0 ${
-                              isSelected
-                                ? "bg-[#EEF1FB] border-l-2 border-[#2F4BC0] pl-[18px]"
-                                : "hover:bg-[#F7F6F2]"
-                            }`}
-                          >
-                            <td className="min-w-0">
-                              <div className="flex items-center gap-[12px] min-w-0">
-                                <div className={`flex h-[40px] w-[40px] items-center justify-center rounded-[2px] text-[12px] font-bold font-mono ${getAvatarColor(p.name)} shrink-0`}>
-                                  {getInitials(p.name)}
-                                </div>
-                                <div className="flex flex-col min-w-0">
-                                  <p className="truncate text-[14px] font-medium text-[#15171a] min-w-0">{p.name}</p>
-                                  <p className="mt-[1px] text-[12px] text-[#6F7379] font-sans whitespace-nowrap overflow-hidden text-overflow-ellipsis min-w-0">
-                                    {p.club || "Sem clube"} · {p.player_type}
-                                  </p>
-                                </div>
+                      return (
+                        <button
+                          key={p.id}
+                          onClick={() => setSelectedPlayerId(p.id)}
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns: "minmax(0, 1fr) 48px 60px 120px 96px 24px",
+                            columnGap: 12,
+                            alignItems: "center",
+                            width: "100%",
+                          }}
+                          className={`px-[16px] py-[13px] text-left transition-colors border-b-0 h-[64px] min-w-0 ${
+                            isSelected
+                              ? "bg-[#EEF1FB] border-l-2 border-[#2F4BC0] pl-[14px]"
+                              : "hover:bg-[#F7F6F2]"
+                          }`}
+                        >
+                          <td className="min-w-0">
+                            <div className="flex items-center gap-[12px] min-w-0">
+                              <div className={`flex h-[40px] w-[40px] items-center justify-center rounded-[2px] text-[10px] font-bold font-mono ${getAvatarColor(p.name)} shrink-0`}>
+                                {getInitials(p.name)}
                               </div>
-                            </td>
-                            <td className="pl-[20px] pr-[20px] text-right">
-                              <span className="font-mono text-[12px] text-[#15171a]">{p.age ?? "—"}</span>
-                            </td>
-                            <td className="pl-[20px] pr-[20px] text-right">
-                              <span className="font-mono text-[12px] font-semibold text-[#2F4BC0]">{formatRating(rating)}</span>
-                            </td>
-                            <td className="pl-[20px] pr-[20px] text-right">
-                              <div className="potential flex items-center gap-[8px] min-w-0">
-                                <i className="h-[2px] rounded-none bg-[#E3E1DA] overflow-hidden w-[56px] block shrink-0" />
-                                <b className="h-[2px] rounded-none bg-[#2F4BC0] overflow-hidden w-full block shrink-0" style={{ width: `${potential}%` }} />
-                                <span className="font-mono text-[10px] text-[#6F7379] shrink-0">{potential}</span>
+                              <div className="flex flex-col min-w-0">
+                                <p className="truncate text-[14px] font-medium text-[#15171a] min-w-0">{p.name}</p>
+                                <p className="mt-[1px] text-[12px] text-[#6F7379] font-sans whitespace-nowrap overflow-hidden text-overflow-ellipsis min-w-0">
+                                  {p.club || "Sem clube"} · {p.player_type}
+                                </p>
                               </div>
-                            </td>
-                            <td className="pl-[20px] pr-[20px]">
-                              {getStatusBadge(status)}
-                            </td>
-                            <td className="pl-[20px] pr-[20px] text-center">
-                              <span className="h-4 w-4 text-[#6F7379] shrink-0">›</span>
-                            </td>
-                          </button>
-                        );
-                      })}
-                      {playerList.length === 0 && (
-                        <tr style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 64px 72px 150px 110px 32px", columnGap: 16, alignItems: "center", width: "100%" }}>
-                          <td colSpan={6} className="px-[20px] py-[30px] text-center text-[#6F7379] text-[12px]">
-                            Nenhum jogador encontrado.
+                            </div>
                           </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
+                          <td className="pl-[16px] pr-[16px] text-right">
+                            <span className="font-mono text-[12px] text-[#15171a]">{p.age ?? "—"}</span>
+                          </td>
+                          <td className="pl-[16px] pr-[16px] text-right">
+                            <span className="font-mono text-[12px] font-semibold text-[#2F4BC0]">{formatRating(rating)}</span>
+                          </td>
+                          <td className="pl-[16px] pr-[16px] text-right">
+                            <div className="potential flex items-center gap-[8px] min-w-0">
+                              <span className="font-mono text-[12px] text-[#6F7379] shrink-0">{potential}</span>
+                              <div className="bar-track h-[4px] w-[56px] rounded-[2px] bg-[#E3E1DA] relative shrink-0 overflow-hidden">
+                                <b className="h-full bg-[#2F4BC0] block" style={{ width: `${potential}%` }} />
+                              </div>
+                            </div>
+                          </td>
+                          <td className="pl-[16px] pr-[16px]">
+                            {getStatusBadge(status)}
+                          </td>
+                          <td className="pl-[16px] pr-[16px] text-center">
+                            <span className="h-4 w-4 text-[#6F7379] shrink-0">›</span>
+                          </td>
+                        </button>
+                      );
+                    })}
+                    {playerList.length === 0 && (
+                      <tr style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 48px 60px 120px 96px 24px", columnGap: 12, alignItems: "center", width: "100%" }}>
+                        <td colSpan={6} className="px-[16px] py-[30px] text-center text-[#6F7379] text-[12px]">
+                          Nenhum jogador encontrado.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
             </div>
 
             {/* Coluna direita: Relatório do jogador */}
             {selectedPlayer && (
-              <div className="sticky top-80 flex flex-col h-full min-w-[320px] overflow-hidden min-w-0">
-                <div className="border-1 border-[#E3E1DA] rounded-[4px] overflow-hidden bg-white flex flex-col [max-height:calc(100vh-114px)] overflow-hidden min-w-0">
-                  <div className="bg-[#F3F2EE] border-b border-[#E3E1DA] p-[16px] flex items-center justify-between min-w-0">
+              <div className="sticky top-80 flex flex-col h-full min-w-[380px] overflow-hidden min-w-0">
+                <div className="border-1 border-[#E3E1DA] rounded-[4px] overflow-hidden bg-white flex flex-col [max-height:calc(100vh-100px)] overflow-hidden min-w-0">
+                  <div className="border-b border-[#E3E1DA] p-[16px] flex items-center justify-between min-w-0 shrink-0">
                     <span className="font-mono text-[11px] font-bold text-[#6F7379] uppercase shrink-0">Relatório do jogador</span>
                     <button className="bg-transparent border-0 text-[#6F7379] p-0 hover:text-ink shrink-0">
                       <span className="h-4 w-4">⋯</span>
                     </button>
                   </div>
 
-                  <div className="bg-[#161B26] text-white p-[16px] flex items-center gap-[12px] min-w-0 shrink-0">
-                    <div className={`flex h-[48px] w-[48px] items-center justify-center bg-[#2F4BC0] text-white text-[15px] font-bold font-mono shrink-0`}>
+                  <div className="p-[16px] flex items-center gap-[12px] min-w-0 shrink-0 bg-white">
+                    <div className={`flex h-[48px] w-[48px] items-center justify-center rounded-full bg-[#2F4BC0] text-white text-[15px] font-bold font-mono shrink-0`}>
                       {getInitials(selectedPlayer.name)}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h2 className="text-[18px] font-semibold text-white leading-tight">{selectedPlayer.name}</h2>
-                      <p className="mt-[1px] text-[12px] text-[#D7DCD9] font-sans shrink-0">
+                      <h2 className="text-[18px] font-semibold text-[#15171a] leading-tight">{selectedPlayer.name}</h2>
+                      <p className="mt-[1px] text-[12px] text-[#6F7379] font-sans shrink-0">
                         {selectedPlayer.club || "Sem clube"} · {selectedPlayer.player_type}
                       </p>
                     </div>
-                    <button className="bg-transparent border-0 text-[#D7DCD9] p-0 hover:text-white shrink-0">
+                    <button className="bg-transparent border-0 text-[#6F7379] p-0 hover:text-ink shrink-0">
                       <Bookmark className="h-4 w-4 shrink-0" />
                     </button>
                   </div>
@@ -423,9 +428,9 @@ function VisaoGeralPage() {
                     {["Visão geral", "Métricas", "Histórico"].map((item, idx) => (
                       <button
                         key={item}
-                        className={`flex-1 py-[8px] text-[10px] font-mono font-bold uppercase transition-colors border-b-2 ${
+                        className={`text-[10px] font-mono font-bold uppercase transition-colors border-b-2 ${
                           item === "Visão geral" ? "border-[#2F4BC0] text-[#2F4BC0]" : "border-transparent text-[#6F7379] hover:bg-[#F7F7F5]"
-                        } shrink-0`}
+                        } px-[16px] py-[8px] shrink-0`}
                       >
                         {item}
                       </button>
@@ -441,7 +446,7 @@ function VisaoGeralPage() {
                       </div>
                       <div className="flex flex-col min-w-0 shrink-0">
                         <span className="font-mono text-[8px] font-bold text-[#6F7379] uppercase">Potencial</span>
-                        <strong className="font-mono text-[14px] text-[#15171a]">85</strong>
+                        <strong className="font-mono text-[14px] text-[#15171a]">{selectedPotential}</strong>
                         <span className="text-[10px] text-[#4EAA6A] mt-[2px]">Acima da média</span>
                       </div>
                       <div className="flex flex-col min-w-0 shrink-0">
