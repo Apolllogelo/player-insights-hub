@@ -194,7 +194,7 @@ function SidebarNav() {
     if (capturing) return;
     setCapturing(true);
     const toastId = toast.loading("Capturando tela...");
-    let originalGetComputedStyle: () => CSSStyleDeclaration;
+    let originalGetComputedStyle = window.getComputedStyle.bind(window);
     try {
       const element = document.querySelector("main");
       if (!element) {
@@ -203,22 +203,20 @@ function SidebarNav() {
       }
 
       // html2canvas lê getComputedStyle, que pode retornar oklab; intercepta e filtra antes de capturar
-      originalGetComputedStyle = window.getComputedStyle.bind(window);
-      window.getComputedStyle = (el: Element, pseudoElt?: string | null) => {
+      window.getComputedStyle = ((el: Element, pseudoElt?: string | null) => {
         const computed = originalGetComputedStyle(el, pseudoElt);
         return new Proxy(computed, {
-          get(target: CSSStyleDeclaration, prop: string | symbol) {
-            const value = target[prop as keyof CSSStyleDeclaration];
+          get(target: any, prop: string | symbol) {
+            const value = target[prop];
             if (typeof value === "string" && value.includes("oklab")) {
               return value.replace(/oklab\([^)]*\)/g, "rgb(247, 248, 246)");
             }
             return value;
           },
         }) as unknown as CSSStyleDeclaration;
-      };
+      }) as typeof window.getComputedStyle;
 
-      try {
-        const canvas = await html2canvas(element as HTMLElement, {
+      const canvas = await html2canvas(element as HTMLElement, {
         scale: 2,
         useCORS: true,
         logging: false,
