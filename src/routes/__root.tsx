@@ -224,7 +224,7 @@ function SidebarNav() {
             el.style.minHeight = "100vh";
           }
 
-          // html2canvas não suporta cores oklab; remove-as para evitar erro de parse
+          // Remove cores oklab de estilos inline (html2canvas não as suporta)
           const walker = clonedDoc.createTreeWalker(clonedDoc, NodeFilter.SHOW_ELEMENT);
           let node: Node | null;
           while ((node = walker.nextNode())) {
@@ -233,6 +233,21 @@ function SidebarNav() {
               if (String(el.style.getPropertyValue(prop)).includes("oklab")) {
                 el.style.removeProperty(prop);
               }
+            }
+          }
+
+          // Remove cores oklab de regras CSS externas no clone
+          for (const sheet of Array.from(clonedDoc.styleSheets)) {
+            try {
+              const rules = Array.from((sheet as CSSStyleSheet).cssRules || []);
+              for (const rule of rules) {
+                const cssRule = rule as CSSStyleRule;
+                if (cssRule.style && String(cssRule.style.cssText).includes("oklab")) {
+                  cssRule.style.cssText = String(cssRule.style.cssText).replace(/oklab\([^)]*\)/g, "");
+                }
+              }
+            } catch {
+              // cross-origin sheet: ignora
             }
           }
         },
