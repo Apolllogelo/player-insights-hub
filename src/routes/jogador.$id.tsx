@@ -270,8 +270,8 @@ function PlayerSheet() {
             <svg viewBox="0 0 360 320" width="100%" height="100%" className="shrink-0">
               <defs>
                 <radialGradient id="grad1" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
-                  <stop offset="0%" style="stop-color:#ffffff;stop-opacity:0" />
-                  <stop offset="100%" style="stop-color:#000000;stop-opacity:0.1" />
+                <stop offset="0%" style={{ stopColor: "#ffffff", stopOpacity: 0 }} />
+                <stop offset="100%" style={{ stopColor: "#000000", stopOpacity: 0.1 }} />
                 </radialGradient>
               </defs>
               {/* Centro */}
