@@ -16,29 +16,6 @@ export default defineConfig({
           routeTreeFile: "./src/routeTree.gen.ts",
         },
       }),
-      {
-        name: "faces-static",
-        configureServer(server) {
-          server.middlewares.use("/faces", (req, res, next) => {
-            // Serve files from the FM26 faces folder
-            const facesDir = path.resolve(
-              "C:/Users/angel/OneDrive/Documentos/Sports Interactive/Football Manager 26/graphics/faces/faces",
-            );
-            const url = req.url ?? "/";
-            const filePath = path.join(facesDir, url.split("?")[0] ?? "");
-            res.setHeader("Access-Control-Allow-Origin", "*");
-            // Use send from vite's internal serve-static or fs
-            import("fs").then(({ existsSync, createReadStream, statSync }) => {
-              if (existsSync(filePath) && statSync(filePath).isFile()) {
-                res.setHeader("Content-Type", "image/png");
-                createReadStream(filePath).pipe(res);
-              } else {
-                next();
-              }
-            });
-          });
-        },
-      },
     ],
   },
 });
