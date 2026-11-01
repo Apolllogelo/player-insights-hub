@@ -45,7 +45,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { resetPlayers } from "../lib/scout-api";
+import { resetPlayers, importDataset } from "../lib/scout-api";
 
 function NotFoundComponent() {
   return (
@@ -158,6 +158,7 @@ function SidebarNav() {
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [capturing, setCapturing] = useState(false);
+  const [importing, setImporting] = useState(false);
 
   const navItems = [
     { to: "/", icon: LayoutDashboard, label: "Visão geral", exact: true },
@@ -189,8 +190,54 @@ function SidebarNav() {
     }
   }
 
+  async function handleImport(file: File) {
+    setImporting(true);
+    try {
+      const text = await file.text();
+      const lines = text.split("\n").filter((l) => l.trim());
+      if (lines.length === 0) throw new Error("Arquivo vazio");
+
+      const headers = lines[0].split(",").map((h) => h.trim());
+      const rows = lines.slice(1).map((line) => {
+        const values = line.split(",").map((v) => v.trim());
+        const obj: Record<string, unknown> = {};
+        headers.forEach((h, i) => {
+          obj[h] = values[i] ?? "";
+        });
+        return obj;
+      });
+
+      const idMap: Record<string, string> = {};
+      const metrics: { column: string; label: string; invert: boolean }[] = [];
+      headers.forEach((h) => {
+        idMap[h] = h;
+        metrics.push({ column: h, label: h, invert: false });
+      });
+
+      await importDataset({
+        name: file.name.replace(/\.[^/.]+$/, ""),
+        player_type: "default",
+        columns: headers,
+        rows,
+        id_map: idMap as any,
+        metrics: metrics as any,
+      });
+
+      toast.success(`Planilha "${file.name}" importada com ${rows.length} jogadores.`);
+      router.invalidate();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao importar planilha.");
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  function handleImportClick() {
+    const input = document.getElementById("import-file-input") as HTMLInputElement | null;
+    if (input) input.click();
+  }
+
   async function handleCapture() {
-    if (capturing) return;
     setCapturing(true);
     const toastId = toast.loading("Capturando tela...");
     try {
@@ -310,6 +357,17 @@ function SidebarNav() {
             <p className="text-[10px] text-muted-foreground">Head Scout</p>
           </div>
         </div>
+
+        <input
+          id="import-file-input"
+          type="file"
+          accept=".csv"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) handleImport(file);
+          }}
+        />
       </aside>
 
       <header className="fixed left-[230px] right-0 top-0 z-20 flex h-[64px] items-center justify-between border-b border-border bg-background/0.94 backdrop-blur-[14px] px-[32px]">
@@ -332,6 +390,8 @@ function SidebarNav() {
           <Button
             size="sm"
             className="h-[38px] gap-2 bg-primary text-white hover:bg-primary/90 rounded-none px-[14px] font-[600] text-[12px]"
+            onClick={handleImportClick}
+            disabled={importing}
           >
             <Upload className="h-4 w-4" />
             <span>Importar planilha</span>
