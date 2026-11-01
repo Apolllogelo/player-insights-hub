@@ -46,6 +46,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { resetPlayers, importDataset } from "../lib/scout-api";
+import * as XLSX from "xlsx";
 
 function NotFoundComponent() {
   return (
@@ -193,19 +194,47 @@ function SidebarNav() {
   async function handleImport(file: File) {
     setImporting(true);
     try {
-      const text = await file.text();
-      const lines = text.split("\n").filter((l) => l.trim());
-      if (lines.length === 0) throw new Error("Arquivo vazio");
+      let headers: string[];
+      let rows: Record<string, unknown>[];
 
-      const headers = lines[0].split(",").map((h) => h.trim());
-      const rows = lines.slice(1).map((line) => {
-        const values = line.split(",").map((v) => v.trim());
-        const obj: Record<string, unknown> = {};
-        headers.forEach((h, i) => {
-          obj[h] = values[i] ?? "";
+      const ext = file.name.toLowerCase().split(".").pop();
+
+      if (ext === "csv") {
+        const text = await file.text();
+        const lines = text.split("\n").filter((l) => l.trim());
+        if (lines.length === 0) throw new Error("Arquivo vazio");
+
+        headers = lines[0].split(",").map((h) => h.trim());
+        rows = lines.slice(1).map((line) => {
+          const values = line.split(",").map((v) => v.trim());
+          const obj: Record<string, unknown> = {};
+          headers.forEach((h, i) => {
+            obj[h] = values[i] ?? "";
+          });
+          return obj;
         });
-        return obj;
-      });
+      } else if (ext === "xlsx" || ext === "xls") {
+        const buffer = await file.arrayBuffer();
+        const workbook = XLSX.read(buffer, { type: "array" });
+        const sheetName = workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
+        const data = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false });
+
+        if (!data || data.length === 0) throw new Error("Arquivo vazio");
+
+        headers = data[0] as string[];
+        rows = data.slice(1).map((row: any[]) => {
+          const obj: Record<string, unknown> = {};
+          headers.forEach((h, i) => {
+            obj[h] = row[i] ?? "";
+          });
+          return obj;
+        });
+      } else {
+        throw new Error("Formato não suportado. Use .csv, .xlsx ou .xls");
+      }
+
+      if (rows.length === 0) throw new Error("Nenhuma linha de dados encontrada");
 
       const idMap: Record<string, string> = {};
       const metrics: { column: string; label: string; invert: boolean }[] = [];
@@ -361,7 +390,7 @@ function SidebarNav() {
         <input
           id="import-file-input"
           type="file"
-          accept=".csv"
+          accept=".csv,.xlsx,.xls"
           className="hidden"
           onChange={(e) => {
             const file = e.target.files?.[0];
