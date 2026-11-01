@@ -43,9 +43,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
-import { MappingFields } from "@/components/mapping-fields";
 import { resetPlayers, importDataset } from "../lib/scout-api";
 import { emptyIdMap, METRIC_SLOTS, type IdMap, type Metric } from "../lib/scout-types";
 import * as XLSX from "xlsx";
@@ -162,18 +160,23 @@ function SidebarNav() {
   const [resetting, setResetting] = useState(false);
   const [capturing, setCapturing] = useState(false);
   const [importing, setImporting] = useState(false);
-  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [importStage, setImportStage] = useState<"file" | "mapping" | "confirm">("file");
   const [importColumns, setImportColumns] = useState<string[]>([]);
   const [importRows, setImportRows] = useState<Record<string, unknown>[]>([]);
   const [importFileName, setImportFileName] = useState("");
+  const [importPlayerType, setImportPlayerType] = useState("");
   const [importIdMap, setImportIdMap] = useState<IdMap>(emptyIdMap);
   const [importMetrics, setImportMetrics] = useState<Metric[]>([]);
-  const [importPlayerType, setImportPlayerType] = useState("");
+  const [metricSearch, setMetricSearch] = useState("");
+  const [usedColumns, setUsedColumns] = useState<Set<string>>(new Set());
+
+  // Persistência: carregar mapeamento salvo por perfil de posição
+  const [savedMapping, setSavedMapping] = useState<{ idMap: IdMap; metrics: Metric[] } | null>(null);
 
   const navItems = [
     { to: "/", icon: LayoutDashboard, label: "Visão geral", exact: true },
     { to: "/jogadores", icon: Users, label: "Jogadores", badge: "0" },
-    { to: "/mapear", icon: Settings2, label: "Perfis de posição" },
+    { to: "/mapear", icon: Settings2, label: "Perfis de posição", badge: "0" },
     { to: "/shortlist", icon: Bookmark, label: "Shortlist", badge: "0" },
   ];
 
@@ -184,6 +187,80 @@ function SidebarNav() {
     if (pathname.startsWith("/shortlist")) return "Scoutboard / Shortlist";
     if (pathname.startsWith("/planejador")) return "Scoutboard / Planejador";
     return "Scoutboard / Visão geral";
+  };
+
+  // Helpers de normalização para auto-match
+  const normalize = (s: string) =>
+    s
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+
+  const autoMapIdMap = (headers: string[]): IdMap => {
+    const next: Partial<IdMap> = { ...emptyIdMap };
+    const fields: Array<keyof IdMap & string> = [
+      "name", "club", "position", "age", "foot", "nationality", "height", "salary", "rating", "fullGames", "uid",
+    ];
+    const aliases: Record<string, string[]> = {
+      name: ["nome", "jogador", "player", "player_name"],
+      club: ["clube", "club", "time"],
+      position: ["posicao", "posição", "position"],
+      age: ["idade", "age"],
+      foot: ["pe", "pé", "foot"],
+      nationality: ["nacionalidade", "nationality", "nation"],
+      height: ["altura", "height"],
+      salary: ["salario", "salário", "salary"],
+      rating: ["nota", "nota_media", "rating"],
+      fullGames: ["jogos_completos", "full_games", "jogos"],
+      uid: ["uid", "foto"],
+    };
+    fields.forEach((field) => {
+      const candidates = aliases[field] ?? [field];
+      const match = headers.find((h) => candidates.includes(normalize(h)));
+      if (match) next[field as keyof IdMap] = match;
+    });
+    return next as IdMap;
+  };
+
+  const autoMapMetrics = (headers: string[]): Metric[] => {
+    const defaultsInvert = new Set(["falhas", "diferenca_defesas_esperadas", "diferença defesas esperadas"]);
+    return headers.map((h) => ({
+      column: h,
+      label: h,
+      invert: defaultsInvert.has(normalize(h)),
+    }));
+  };
+
+  const loadSavedMapping = (playerType: string) => {
+    try {
+      const raw = localStorage.getItem(`scout_import_mapping_${playerType}`);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        setImportIdMap(parsed.idMap ?? emptyIdMap);
+        setImportMetrics(parsed.metrics ?? []);
+        setSavedMapping({ idMap: parsed.idMap ?? emptyIdMap, metrics: parsed.metrics ?? [] });
+      } else {
+        setImportIdMap(emptyIdMap);
+        setImportMetrics(Array.from({ length: METRIC_SLOTS }, () => ({ column: "", label: "", invert: false })));
+        setSavedMapping(null);
+      }
+    } catch {
+      setImportIdMap(emptyIdMap);
+      setImportMetrics(Array.from({ length: METRIC_SLOTS }, () => ({ column: "", label: "", invert: false })));
+      setSavedMapping(null);
+    }
+  };
+
+  const saveMapping = () => {
+    if (!importPlayerType) return;
+    try {
+      localStorage.setItem(
+        `scout_import_mapping_${importPlayerType}`,
+        JSON.stringify({ idMap: importIdMap, metrics: importMetrics }),
+      );
+    } catch {}
   };
 
   async function handleReset() {
@@ -248,9 +325,11 @@ function SidebarNav() {
       setImportColumns(headers);
       setImportRows(rows);
       setImportFileName(file.name.replace(/\.[^/.]+$/, ""));
-      setImportIdMap(emptyIdMap);
-      setImportMetrics(Array.from({ length: METRIC_SLOTS }, () => ({ column: "", label: "", invert: false })));
       setImportPlayerType("");
+      setImportIdMap(autoMapIdMap(headers));
+      setImportMetrics(autoMapMetrics(headers));
+      setUsedColumns(new Set());
+      setImportStage("mapping");
       setImportDialogOpen(true);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Falha ao ler a planilha.");
@@ -264,12 +343,12 @@ function SidebarNav() {
       toast.error("Selecione um perfil de posição antes de importar.");
       return;
     }
-
-    // Verificar se o campo obrigatório 'name' está mapeado
     if (!importIdMap.name) {
       toast.error("O campo 'Nome do jogador' é obrigatório.");
       return;
     }
+
+    saveMapping();
 
     setImporting(true);
     try {
@@ -284,6 +363,7 @@ function SidebarNav() {
 
       toast.success(`Planilha "${importFileName}" importada com ${importRows.length} jogadores.`);
       setImportDialogOpen(false);
+      setImportStage("file");
       router.invalidate();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Falha ao importar planilha.");
@@ -315,7 +395,10 @@ function SidebarNav() {
         while ((n = walker.nextNode())) {
           const el = n as HTMLElement;
           for (const prop of Object.keys(el.style)) {
-            if (String(el.style.getPropertyValue(prop)).includes("oklab") || String(el.style.getPropertyValue(prop)).includes("oklch")) {
+            if (
+              String(el.style.getPropertyValue(prop)).includes("oklab") ||
+              String(el.style.getPropertyValue(prop)).includes("oklch")
+            ) {
               el.style.removeProperty(prop);
             }
           }
@@ -328,7 +411,9 @@ function SidebarNav() {
               if (cssRule.style) {
                 const cssText = String(cssRule.style.cssText);
                 if (cssText.includes("oklab") || cssText.includes("oklch")) {
-                  cssRule.style.cssText = cssText.replace(/oklab\([^)]*\)/g, "").replace(/oklch\([^)]*\)/g, "");
+                  cssRule.style.cssText = cssText
+                    .replace(/oklab\([^)]*\)/g, "")
+                    .replace(/oklch\([^)]*\)/g, "");
                 }
               }
             }
@@ -346,7 +431,9 @@ function SidebarNav() {
         cacheBust: true,
         canvasHeight: element.scrollHeight * 2,
         canvasWidth: element.scrollWidth * 2,
-        filter: (node) => !(node instanceof HTMLElement && (node.classList?.contains("toaster") || node.getAttribute("role") === "status" || node.getAttribute("data-sonner-toaster") === "true")),
+        filter:
+          (node) =>
+            !(node instanceof HTMLElement && (node.classList?.contains("toaster") || node.getAttribute("role") === "status" || node.getAttribute("data-sonner-toaster") === "true")),
         height: element.scrollHeight,
         pixelRatio: 2,
         width: element.scrollWidth,
@@ -369,9 +456,71 @@ function SidebarNav() {
     }
   }
 
+  // Componentes do modal de importação
+  const ImportColumnSelect = ({
+    value,
+    onChange,
+    columns,
+    disabledColumns,
+    placeholder,
+  }: {
+    value: string;
+    onChange: (v: string) => void;
+    columns: string[];
+    disabledColumns: Set<string>;
+    placeholder: string;
+  }) => {
+    const available = columns.filter((c) => !disabledColumns.has(c) || c === value);
+    return (
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full border border-input rounded-none bg-surface px-2 text-[11px] text-foreground outline-none focus:ring-1 focus:ring-primary"
+      >
+        <option value="">{placeholder}</option>
+        {available.map((c) => (
+          <option key={c} value={c} disabled={disabledColumns.has(c) && c !== value}>
+            {c}
+          </option>
+        ))}
+      </select>
+    );
+  };
+
+  const ID_FIELDS: Array<{ key: keyof IdMap; label: string; required?: boolean }> = [
+    { key: "name", label: "Jogador", required: true },
+    { key: "club", label: "Clube", required: true },
+    { key: "position", label: "Posição", required: true },
+    { key: "age", label: "Idade" },
+    { key: "foot", label: "Pé preferido" },
+    { key: "nationality", label: "Nacionalidade" },
+    { key: "height", label: "Altura" },
+    { key: "salary", label: "Salário" },
+    { key: "rating", label: "Nota média" },
+    { key: "fullGames", label: "Jogos completos" },
+    { key: "uid", label: "UID (foto do jogador)" },
+  ];
+
+  const metricLabels: Record<string, string> = {
+    "def_dif": "% Def Difíceis",
+    "defesas_90": "Defesas / 90",
+    "bolas_dificeis": "Bolas difíceis",
+    "xg_defendidos_90": "xG defendidos / 90",
+    "xgp": "Expected Goals Prevented",
+    "indice_impacto": "Índice de impacto",
+    "def_seguras": "% Def Seguras",
+    "acerto_goleiro": "% Acerto do goleiro",
+    "diferenca_defesas_esperadas": "Diferença defesas esperadas – feitas",
+    "saidas_sucesso_90": "Saídas do gol com sucesso / 90",
+    "acerto_saidas": "% Acerto nas saídas do gol",
+    "passes_certos": "% Passes certos",
+    "jogos_sem_sofrer_gol": "% jogos sem sofrer gol",
+    "falhas": "Falhas",
+  };
+
   return (
     <>
-        <aside className="fixed left-0 top-0 z-30 flex h-screen flex-col bg-sidebar text-sidebar-foreground w-[230px] p-[24px_16px_18px]">
+      <aside className="fixed left-0 top-0 z-30 flex h-screen flex-col bg-sidebar text-sidebar-foreground w-[230px] p-[24px_16px_18px]">
         <div className="flex items-center gap-[11px] font-sans text-[16px] font-semibold mb-[38px] mx-[8px]">
           <div className="flex h-[30px] w-[30px] items-center justify-center bg-surface text-sidebar text-[11px] font-mono font-medium">
             SB
@@ -429,44 +578,263 @@ function SidebarNav() {
           }}
         />
 
-        <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
-          <DialogContent className="max-w-2xl sm:max-w-[600px] p-0">
-            <DialogHeader>
-              <DialogTitle>Importar planilha</DialogTitle>
-              <DialogDescription>
-                Mapeie as colunas da planilha para os campos do sistema e selecione o perfil de posição.
-              </DialogDescription>
-            </DialogHeader>
-            <DialogContent className="p-6 space-y-4">
-              <div className="space-y-2">
-                <label className="text-xs font-mono font-bold text-muted-foreground uppercase tracking-[0.06em]">
-                  Perfil de posição
-                </label>
-                <Input
-                  placeholder="Ex: Goleiro, Zagueiro, Atacante..."
-                  value={importPlayerType}
-                  onChange={(e) => setImportPlayerType(e.target.value)}
-                />
+        <Dialog open={importDialogOpen} onOpenChange={(open) => {
+          if (!open) {
+            setImportStage("file");
+            setImportColumns([]);
+            setImportRows([]);
+            setImportFileName("");
+            setImportPlayerType("");
+            setImportIdMap(emptyIdMap);
+            setImportMetrics(Array.from({ length: METRIC_SLOTS }, () => ({ column: "", label: "", invert: false })));
+            setUsedColumns(new Set());
+          }
+          setImportDialogOpen(open);
+        }}>
+          <DialogContent className="p-0 max-w-[min(960px,calc(100vw-48px))] max-h-[calc(100vh-48px)] rounded-[4px] border border-[#E3E1DA] bg-[#F3F2EE] overflow-hidden flex flex-col min-w-0">
+            {/* Cabeçalho fixo */}
+            <div className="flex items-center justify-between border-b border-[#E3E1DA] px-[24px] py-[20px] bg-[#F3F2EE] shrink-0 min-w-0">
+              <div className="min-w-0 flex flex-col gap-[2px]">
+                <DialogTitle className="text-[18px] font-semibold text-[#15171a] leading-tight">
+                  Mapear colunas · {importPlayerType}
+                </DialogTitle>
+                <DialogDescription className="text-[12px] text-[#6F7379] font-sans leading-[1.4]">
+                  Mapeie as colunas da planilha para os campos do sistema antes de importar.
+                </DialogDescription>
               </div>
-              <MappingFields
-                columns={importColumns}
-                idMap={importIdMap}
-                metrics={importMetrics}
-                onIdMapChange={setImportIdMap}
-                onMetricsChange={setImportMetrics}
-              />
-            </DialogContent>
-            <DialogFooter>
-              <Button onClick={() => setImportDialogOpen(false)} variant="outline">
-                Cancelar
-              </Button>
-              <Button
-                onClick={handleConfirmImport}
-                disabled={importing || !importPlayerType}
+              <div className="flex items-center gap-[8px] shrink-0 min-w-0">
+                <span className="font-mono text-[11px] font-bold text-[#2F4BC0] shrink-0">
+                  {importMetrics.filter((m) => m.column).length} de {METRIC_SLOTS} avaliações mapeadas
+                </span>
+                <button
+                  onClick={() => setImportDialogOpen(false)}
+                  className="flex h-[8px] w-[8px] items-center justify-center rounded-full border border-[#E3E1DA] text-[#6F7379] hover:bg-[#2A3530] hover:text-white shrink-0"
+                  aria-label="Fechar"
+                >
+                  <span className="text-[10px]">✕</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Corpo com rolagem */}
+            <div className="flex-1 overflow-y-auto overflow-x-hidden min-w-0 shrink-0">
+              {/* Etapa 1: Escolher arquivo */}
+              {importStage === "file" && (
+                <div className="p-[24px] flex flex-col items-center justify-center min-h-[300px] min-w-0">
+                  <div className="flex h-[64px] w-[64px] items-center justify-center rounded-full bg-[#E8ECFA] text-[#2F4BC0] text-[24px] shrink-0 mb-[16px]">
+                    <Upload className="h-[28px] w-[28px]" />
+                  </div>
+                  <h2 className="text-[20px] font-semibold text-[#15171a] mb-[8px]">Escolha a planilha</h2>
+                  <p className="text-[12px] text-[#6F7379] font-sans text-center mb-[20px] max-w-[360px]">
+                    Selecione um arquivo .csv, .xlsx ou .xls com os dados dos jogadores.
+                  </p>
+                  <Button
+                    onClick={handleImportClick}
+                    disabled={importing}
+                    className="h-[40px] px-[24px] bg-[#2F4BC0] text-white rounded-none text-[11px] font-mono font-bold hover:bg-[#2F4BC0]/90 shrink-0"
+                  >
+                    Selecionar arquivo
+                  </Button>
+                </div>
+              )}
+
+              {/* Etapa 2: Mapear colunas */}
+              {importStage === "mapping" && (
+                <div className="p-[20px] overflow-y-auto min-h-[400px] min-w-0 shrink-0">
+                  <div className="space-y-4 min-w-0">
+                    {/* Perfil de posição */}
+                    <div className="space-y-2 min-w-0">
+                      <label className="text-[11px] font-mono font-bold text-[#6F7379] uppercase tracking-[0.06em]">
+                        Perfil de posição
+                      </label>
+                      <Input
+                        placeholder="Ex: Goleiro, Zagueiro, Atacante..."
+                        value={importPlayerType}
+                        onChange={(e) => {
+                          setImportPlayerType(e.target.value);
+                          loadSavedMapping(e.target.value);
+                        }}
+                        className="w-full border border-input rounded-none bg-surface px-[12px] py-[10px] text-[12px] text-foreground outline-none focus:ring-1 focus:ring-primary"
+                      />
+                    </div>
+
+                    {/* Busca de colunas */}
+                    <div className="relative min-w-0 shrink-0">
+                      <Search className="absolute left-[10px] top-[9px] h-4 w-4 text-[#6F7379] shrink-0" />
+                      <Input
+                        placeholder="Pesquisar coluna..."
+                        value={metricSearch}
+                        onChange={(e) => setMetricSearch(e.target.value)}
+                        className="w-full pl-[28px] pr-[10px] py-[8px] border border-input rounded-none bg-surface text-[11px] text-foreground outline-none focus:ring-1 focus:ring-primary"
+                      />
+                    </div>
+
+                    {/* Cabeçalho da tabela de mapeamento */}
+                    <div className="grid grid-cols-[32px_minmax(0,1.4fr)_minmax(0,1fr)_auto] gap-[12px] border-b border-[#E3E1DA] bg-[#F3F2EE] px-[16px] py-[10px] sticky top-[160px] z-[10] min-w-0 shrink-0">
+                      <div className="font-mono text-[11px] font-bold text-[#6F7379] uppercase text-center shrink-0">#</div>
+                      <div className="font-mono text-[11px] font-bold text-[#6F7379] uppercase shrink-0">COLUNA</div>
+                      <div className="font-mono text-[11px] font-bold text-[#6F7379] uppercase shrink-0">NOME CURTO</div>
+                      <div className="font-mono text-[11px] font-bold text-[#6F7379] uppercase shrink-0">MENOR É MELHOR</div>
+                    </div>
+
+                    {/* Campos de identificação */}
+                    <div className="grid grid-cols-[repeat(3,minmax(0,1fr))] gap-[16px] mb-[24px] min-w-0 shrink-0">
+                      {ID_FIELDS.map((field) => {
+                        const currentValue = importIdMap[field.key];
+                        const isUsedElsewhere =
+                          importMetrics.some((m) => m.column === currentValue && currentValue !== "") ||
+                          Object.values(importIdMap).some((v, idx) => v === currentValue && Object.keys(importIdMap)[idx] !== field.key);
+                        return (
+                          <div key={field.key} className="space-y-[6px] min-w-0 shrink-0">
+                            <div className="flex items-center gap-[6px] min-w-0 shrink-0">
+                              <span className="font-mono text-[11px] font-bold text-[#6F7379] shrink-0">
+                                {field.label}
+                              </span>
+                              {field.required && (
+                                <span className="text-[10px] text-[#C2501F] font-bold shrink-0">*</span>
+                              )}
+                            </div>
+                            <ImportColumnSelect
+                              value={currentValue}
+                              onChange={(v) => setImportIdMap({ ...importIdMap, [field.key]: v })}
+                              columns={importColumns}
+                              disabledColumns={usedColumns}
+                              placeholder="Selecionar coluna"
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* 14 Avaliações */}
+                    <div className="space-y-[24px] min-w-0 shrink-0">
+                      <div className="flex items-center justify-between mb-[12px] min-w-0 shrink-0">
+                        <span className="font-mono text-[11px] font-bold text-[#6F7379] uppercase tracking-[0.06em]">
+                          As 14 avaliações
+                        </span>
+                        <span className="font-mono text-[11px] text-[#6F7379] shrink-0">
+                          {importMetrics.filter((m) => m.column).length} mapeadas
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-[32px_minmax(0,1.4fr)_minmax(0,1fr)_auto] gap-[12px] min-w-0 shrink-0">
+                        {importMetrics
+                          .filter((m) => {
+                            const term = normalize(metricSearch);
+                            return (
+                              !term ||
+                              normalize(m.label).includes(term) ||
+                              normalize(m.column).includes(term)
+                            );
+                          })
+                          .map((slot, i) => {
+                            const isUsedElsewhere =
+                              importIdMap.name === slot.column ||
+                              importIdMap.club === slot.column ||
+                              importIdMap.position === slot.column ||
+                              importIdMap.age === slot.column ||
+                              importIdMap.foot === slot.column ||
+                              importIdMap.nationality === slot.column ||
+                              importIdMap.height === slot.column ||
+                              importIdMap.salary === slot.column ||
+                              importIdMap.rating === slot.column ||
+                              importIdMap.fullGames === slot.column ||
+                              importIdMap.uid === slot.column ||
+                              importMetrics.some(
+                                (m, j) => j !== i && m.column === slot.column,
+                              );
+                            const displayLabel = slot.label || metricLabels[slot.column] || slot.column;
+                            return (
+                              <div
+                                key={i}
+                                className="grid grid-cols-[32px_minmax(0,1.4fr)_minmax(0,1fr)_auto] gap-[12px] items-center border-b border-[#E3E1DA] px-[16px] py-[13px] min-w-0 shrink-0 h-[52px]"
+                              >
+                                <div className="font-mono text-[11px] font-bold text-[#6F7379] text-center shrink-0">
+                                  {i + 1}
+                                </div>
+                                <div className="relative min-w-0 shrink-0">
+                                  <ImportColumnSelect
+                                    value={slot.column}
+                                    onChange={(v) => {
+                                      const next = [...importMetrics];
+                                      next[i] = { ...next[i], column: v, label: v ? slot.label || v : "" };
+                                      setImportMetrics(next);
+                                    }}
+                                    columns={importColumns}
+                                    disabledColumns={usedColumns}
+                                    placeholder="Selecionar coluna"
+                                  />
+                                </div>
+                                <div className="flex min-w-0 shrink-0">
+                                  <Input
+                                    value={slot.label}
+                                    onChange={(e) => {
+                                      const next = [...importMetrics];
+                                      next[i] = { ...next[i], label: e.target.value };
+                                      setImportMetrics(next);
+                                    }}
+                                    placeholder="Nome curto no card"
+                                    className="w-full border border-input rounded-none bg-surface px-[10px] py-[8px] text-[11px] text-foreground outline-none focus:ring-1 focus:ring-primary shrink-0"
+                                  />
+                                </div>
+                                <div className="flex items-center gap-[6px] min-w-0 shrink-0">
+                                  <label className="flex items-center gap-[2px] cursor-pointer shrink-0">
+                                    <input
+                                      type="checkbox"
+                                      checked={slot.invert}
+                                      onChange={(e) => {
+                                        const next = [...importMetrics];
+                                        next[i] = { ...next[i], invert: e.target.checked };
+                                        setImportMetrics(next);
+                                      }}
+                                      className="w-4 h-4 rounded-none border border-input text-primary focus:ring-primary"
+                                      readOnly
+                                      onClick={(e) => e.preventDefault()}
+                                    />
+                                    <span className="text-[10px] text-[#6F7379] font-mono shrink-0 whitespace-nowrap">
+                                      Menor é melhor
+                                    </span>
+                                  </label>
+                                </div>
+                                <div className="absolute inset-0 z-[20] opacity-0" />
+                              </div>
+                            );
+                          })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Rodapé fixo */}
+            <div className="border-t border-[#E3E1DA] px-[24px] py-[16px] bg-[#F3F2EE] flex items-center justify-between gap-[12px] shrink-0 min-w-0">
+              <button
+                onClick={() => setImportDialogOpen(false)}
+                className="flex h-[36px] items-center justify-center gap-[8px] rounded-none border border-[#E3E1DA] px-[16px] py-[8px] text-[11px] font-mono font-bold text-[#6F7379] hover:bg-[#F7F6F2] shrink-0"
               >
-                {importing ? "Importando..." : "Confirmar importação"}
-              </Button>
-            </DialogFooter>
+                Cancelar
+              </button>
+              <div className="flex items-center gap-[8px] shrink-0">
+                {importing ? (
+                  <span className="font-mono text-[11px] text-[#6F7379] shrink-0">Importando…</span>
+                ) : (
+                  <>
+                    <Button
+                      onClick={handleConfirmImport}
+                      disabled={importing || !importPlayerType || !importIdMap.name}
+                      className="flex h-[36px] items-center justify-center gap-[8px] rounded-none border-none px-[16px] py-[8px] bg-[#2F4BC0] text-white text-[11px] font-mono font-bold hover:bg-[#2F4BC0]/90 shrink-0"
+                    >
+                      Confirmar importação
+                    </Button>
+                    {!importPlayerType || !importIdMap.name ? (
+                      <span className="text-[10px] text-[#C2501F] font-mono shrink-0 whitespace-nowrap">
+                        {!importPlayerType ? "Informe o perfil de posição" : "Informe o campo Jogador"}
+                      </span>
+                    ) : null}
+                  </>
+                )}
+              </div>
+            </div>
           </DialogContent>
         </Dialog>
       </aside>
