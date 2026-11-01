@@ -1,5 +1,6 @@
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 import path from "path";
+import tanstackRouter from "@tanstack/router-plugin/vite";
 
 export default defineConfig({
   tanstackStart: {
@@ -10,6 +11,11 @@ export default defineConfig({
   vite: {
     publicDir: "public",
     plugins: [
+      tanstackRouter({
+        routeTreeGen: {
+          routeTreeFile: "./src/routeTree.gen.ts",
+        },
+      }),
       {
         name: "faces-static",
         configureServer(server) {
