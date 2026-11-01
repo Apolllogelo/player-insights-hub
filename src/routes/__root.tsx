@@ -29,6 +29,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,16 +37,17 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { MappingFields } from "@/components/mapping-fields";
 import { resetPlayers, importDataset } from "../lib/scout-api";
+import { emptyIdMap, METRIC_SLOTS, type IdMap, type Metric } from "../lib/scout-types";
 import * as XLSX from "xlsx";
 
 function NotFoundComponent() {
@@ -160,6 +162,13 @@ function SidebarNav() {
   const [resetting, setResetting] = useState(false);
   const [capturing, setCapturing] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [importColumns, setImportColumns] = useState<string[]>([]);
+  const [importRows, setImportRows] = useState<Record<string, unknown>[]>([]);
+  const [importFileName, setImportFileName] = useState("");
+  const [importIdMap, setImportIdMap] = useState<IdMap>(emptyIdMap);
+  const [importMetrics, setImportMetrics] = useState<Metric[]>([]);
+  const [importPlayerType, setImportPlayerType] = useState("");
 
   const navItems = [
     { to: "/", icon: LayoutDashboard, label: "Visão geral", exact: true },
@@ -236,23 +245,45 @@ function SidebarNav() {
 
       if (rows.length === 0) throw new Error("Nenhuma linha de dados encontrada");
 
-      const idMap: Record<string, string> = {};
-      const metrics: { column: string; label: string; invert: boolean }[] = [];
-      headers.forEach((h) => {
-        idMap[h] = h;
-        metrics.push({ column: h, label: h, invert: false });
-      });
+      setImportColumns(headers);
+      setImportRows(rows);
+      setImportFileName(file.name.replace(/\.[^/.]+$/, ""));
+      setImportIdMap(emptyIdMap);
+      setImportMetrics(Array.from({ length: METRIC_SLOTS }, () => ({ column: "", label: "", invert: false })));
+      setImportPlayerType("");
+      setImportDialogOpen(true);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao ler a planilha.");
+    } finally {
+      setImporting(false);
+    }
+  }
 
+  async function handleConfirmImport() {
+    if (!importPlayerType) {
+      toast.error("Selecione um perfil de posição antes de importar.");
+      return;
+    }
+
+    // Verificar se o campo obrigatório 'name' está mapeado
+    if (!importIdMap.name) {
+      toast.error("O campo 'Nome do jogador' é obrigatório.");
+      return;
+    }
+
+    setImporting(true);
+    try {
       await importDataset({
-        name: file.name.replace(/\.[^/.]+$/, ""),
-        player_type: "default",
-        columns: headers,
-        rows,
-        id_map: idMap as any,
-        metrics: metrics as any,
+        name: importFileName,
+        player_type: importPlayerType,
+        columns: importColumns,
+        rows: importRows,
+        id_map: importIdMap,
+        metrics: importMetrics.filter((m) => m.column),
       });
 
-      toast.success(`Planilha "${file.name}" importada com ${rows.length} jogadores.`);
+      toast.success(`Planilha "${importFileName}" importada com ${importRows.length} jogadores.`);
+      setImportDialogOpen(false);
       router.invalidate();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Falha ao importar planilha.");
@@ -397,6 +428,47 @@ function SidebarNav() {
             if (file) handleImport(file);
           }}
         />
+
+        <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+          <DialogContent className="max-w-2xl sm:max-w-[600px] p-0">
+            <DialogHeader>
+              <DialogTitle>Importar planilha</DialogTitle>
+              <DialogDescription>
+                Mapeie as colunas da planilha para os campos do sistema e selecione o perfil de posição.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogContent className="p-6 space-y-4">
+              <div className="space-y-2">
+                <label className="text-xs font-mono font-bold text-muted-foreground uppercase tracking-[0.06em]">
+                  Perfil de posição
+                </label>
+                <Input
+                  placeholder="Ex: Goleiro, Zagueiro, Atacante..."
+                  value={importPlayerType}
+                  onChange={(e) => setImportPlayerType(e.target.value)}
+                />
+              </div>
+              <MappingFields
+                columns={importColumns}
+                idMap={importIdMap}
+                metrics={importMetrics}
+                onIdMapChange={setImportIdMap}
+                onMetricsChange={setImportMetrics}
+              />
+            </DialogContent>
+            <DialogFooter>
+              <Button onClick={() => setImportDialogOpen(false)} variant="outline">
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleConfirmImport}
+                disabled={importing || !importPlayerType}
+              >
+                {importing ? "Importando..." : "Confirmar importação"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </aside>
 
       <header className="fixed left-[230px] right-0 top-0 z-20 flex h-[64px] items-center justify-between border-b border-border bg-background/0.94 backdrop-blur-[14px] px-[32px]">
