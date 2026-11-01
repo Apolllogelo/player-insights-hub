@@ -336,6 +336,15 @@ function SidebarNav() {
             <Upload className="h-4 w-4" />
             <span>Importar planilha</span>
           </Button>
+          <Button
+            size="sm"
+            className="h-[38px] gap-2 bg-[#E0663A] text-white hover:bg-[#C2501F] rounded-none px-[14px] font-[600] text-[12px]"
+            onClick={handleReset}
+            disabled={resetting}
+          >
+            <RotateCcw className="h-4 w-4" />
+            <span>Resetar base</span>
+          </Button>
         </div>
       </header>
     </>
