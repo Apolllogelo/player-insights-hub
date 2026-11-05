@@ -38,7 +38,7 @@ export const Route = createFileRoute("/mapear")({
   component: MapearPage,
   errorComponent: ({ error }) => (
     <div role="alert" className="mx-auto max-w-5xl px-4 py-16 text-sm text-destructive">
-      {error.message}
+      {error instanceof Error ? error.message : String(error)}
     </div>
   ),
   notFoundComponent: () => <div className="p-8">Perfil não encontrado.</div>,

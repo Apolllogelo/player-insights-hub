@@ -68,7 +68,7 @@ export const Route = createFileRoute("/planejador")({
   component: PlanejadorPage,
   errorComponent: ({ error }) => (
     <div role="alert" className="mx-auto max-w-6xl px-4 py-16 text-sm text-destructive">
-      {error.message}
+      {error instanceof Error ? error.message : String(error)}
     </div>
   ),
   notFoundComponent: () => <div className="p-8">Nada por aqui.</div>,
@@ -547,7 +547,7 @@ function PlanejadorPage() {
       {isError && (
         <div className="flex items-center gap-3 py-8 text-destructive">
           <AlertCircle className="h-5 w-5" />
-          <span>Erro ao carregar a planilha: {error.message}</span>
+          <span>Erro ao carregar a planilha: {error instanceof Error ? error.message : String(error)}</span>
         </div>
       )}
 
