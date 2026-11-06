@@ -153,6 +153,54 @@ function RootShell({ children }: { children: ReactNode }) {
   );
 }
 
+/**
+ * Select nativo de coluna usado no modal de mapeamento.
+ * Fica no escopo do módulo (e não dentro de SidebarNav) para manter a mesma
+ * identidade entre renders — evita que o <select> seja remontado a cada
+ * mudança de estado do modal.
+ */
+function ImportColumnSelect({
+  value,
+  onChange,
+  columns,
+  disabledColumns,
+  placeholder,
+  ariaLabel,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  columns: string[];
+  disabledColumns: Set<string>;
+  placeholder: string;
+  ariaLabel?: string;
+}) {
+  const available = columns.filter((c) => !disabledColumns.has(c) || c === value);
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      aria-label={ariaLabel}
+      className="h-[34px] w-full min-w-0 truncate border border-input rounded-none bg-surface px-2 text-[11px] text-foreground outline-none focus:ring-1 focus:ring-primary"
+    >
+      <option value="">{placeholder}</option>
+      {available.map((c) => (
+        <option key={c} value={c} disabled={disabledColumns.has(c) && c !== value}>
+          {c}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+/**
+ * Template único de colunas das linhas de avaliação do modal.
+ * Cabeçalho e linhas usam exatamente o mesmo template, então ficam sempre alinhados.
+ * Abaixo de `md`: número + conteúdo empilhado. A partir de `md`: 4 colunas
+ * (número | coluna da planilha | nome curto | menor é melhor).
+ */
+const METRIC_ROW_COLS =
+  "gap-x-[12px] gap-y-[8px] px-[16px] grid-cols-[32px_minmax(0,1fr)] md:grid-cols-[40px_minmax(0,1.4fr)_minmax(0,1fr)_120px]";
+
 function SidebarNav() {
   const location = useLocation();
   const pathname = location.pathname;
@@ -458,37 +506,6 @@ function SidebarNav() {
     }
   }
 
-  // Componentes do modal de importação
-  const ImportColumnSelect = ({
-    value,
-    onChange,
-    columns,
-    disabledColumns,
-    placeholder,
-  }: {
-    value: string;
-    onChange: (v: string) => void;
-    columns: string[];
-    disabledColumns: Set<string>;
-    placeholder: string;
-  }) => {
-    const available = columns.filter((c) => !disabledColumns.has(c) || c === value);
-    return (
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full border border-input rounded-none bg-surface px-2 text-[11px] text-foreground outline-none focus:ring-1 focus:ring-primary"
-      >
-        <option value="">{placeholder}</option>
-        {available.map((c) => (
-          <option key={c} value={c} disabled={disabledColumns.has(c) && c !== value}>
-            {c}
-          </option>
-        ))}
-      </select>
-    );
-  };
-
   const ID_FIELDS: Array<{ key: keyof IdMap; label: string; required?: boolean }> = [
     { key: "name", label: "Jogador", required: true },
     { key: "club", label: "Clube", required: true },
@@ -519,6 +536,24 @@ function SidebarNav() {
     "jogos_sem_sofrer_gol": "% jogos sem sofrer gol",
     "falhas": "Falhas",
   };
+
+  // Contagem exibida no modal. Enquanto o perfil de posição não é informado, a
+  // lista traz uma linha por coluna da planilha (sugestão automática) e não as
+  // METRIC_SLOTS avaliações — nesse caso mostramos "colunas detectadas" em vez de
+  // misturar a contagem de colunas com a de avaliações.
+  const mappedCount = importMetrics.filter((m) => m.column).length;
+  const metricsAreSlots = importMetrics.length <= METRIC_SLOTS;
+  const mappedSummary = metricsAreSlots
+    ? `${mappedCount} de ${METRIC_SLOTS} avaliações mapeadas`
+    : `${importMetrics.length} colunas detectadas`;
+
+  // Mantém o índice original de cada avaliação (os handlers editam importMetrics[i]).
+  const visibleMetrics = importMetrics
+    .map((slot, i) => ({ slot, i }))
+    .filter(({ slot }) => {
+      const term = normalize(metricSearch);
+      return !term || normalize(slot.label).includes(term) || normalize(slot.column).includes(term);
+    });
 
   return (
     <>
@@ -593,36 +628,29 @@ function SidebarNav() {
           }
           setImportDialogOpen(open);
         }}>
-          <DialogContent className="p-0 max-w-[min(960px,calc(100vw-48px))] max-h-[calc(100vh-48px)] rounded-[4px] border border-[#E3E1DA] bg-[#F3F2EE] overflow-hidden flex flex-col min-w-0">
-            {/* Cabeçalho fixo */}
-            <div className="flex items-center justify-between border-b border-[#E3E1DA] px-[24px] py-[20px] bg-[#F3F2EE] shrink-0 min-w-0">
-              <div className="min-w-0 flex flex-col gap-[2px]">
+          <DialogContent className="flex min-w-0 max-h-[calc(100dvh-48px)] max-w-[min(960px,calc(100vw-48px))] flex-col gap-0 overflow-hidden rounded-[4px] border border-[#E3E1DA] bg-[#F3F2EE] p-0">
+            {/* Cabeçalho fixo (pr-[56px] libera o botão de fechar nativo do Dialog) */}
+            <div className="flex shrink-0 flex-col gap-[8px] border-b border-[#E3E1DA] bg-[#F3F2EE] py-[20px] pl-[24px] pr-[56px] sm:flex-row sm:items-start sm:justify-between sm:gap-[16px]">
+              <div className="flex min-w-0 flex-col gap-[2px]">
                 <DialogTitle className="text-[18px] font-semibold text-[#15171a] leading-tight">
-                  Mapear colunas · {importPlayerType}
+                  Mapear colunas{importPlayerType ? ` · ${importPlayerType}` : ""}
                 </DialogTitle>
                 <DialogDescription className="text-[12px] text-[#6F7379] font-sans leading-[1.4]">
                   Mapeie as colunas da planilha para os campos do sistema antes de importar.
                 </DialogDescription>
               </div>
-              <div className="flex items-center gap-[8px] shrink-0 min-w-0">
-                <span className="font-mono text-[11px] font-bold text-[#2F4BC0] shrink-0">
-                  {importMetrics.filter((m) => m.column).length} de {METRIC_SLOTS} avaliações mapeadas
+              {importStage === "mapping" && (
+                <span className="shrink-0 whitespace-nowrap font-mono text-[11px] font-bold text-[#2F4BC0] sm:pt-[4px]">
+                  {mappedSummary}
                 </span>
-                <button
-                  onClick={() => setImportDialogOpen(false)}
-                  className="flex h-[8px] w-[8px] items-center justify-center rounded-full border border-[#E3E1DA] text-[#6F7379] hover:bg-[#2A3530] hover:text-white shrink-0"
-                  aria-label="Fechar"
-                >
-                  <span className="text-[10px]">✕</span>
-                </button>
-              </div>
+              )}
             </div>
 
-            {/* Corpo com rolagem */}
-            <div className="flex-1 overflow-y-auto overflow-x-hidden min-w-0 shrink-0">
+            {/* Corpo: único container com rolagem vertical */}
+            <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden">
               {/* Etapa 1: Escolher arquivo */}
               {importStage === "file" && (
-                <div className="p-[24px] flex flex-col items-center justify-center min-h-[300px] min-w-0">
+                <div className="flex min-h-[300px] min-w-0 flex-col items-center justify-center p-[24px]">
                   <div className="flex h-[64px] w-[64px] items-center justify-center rounded-full bg-[#E8ECFA] text-[#2F4BC0] text-[24px] shrink-0 mb-[16px]">
                     <Upload className="h-[28px] w-[28px]" />
                   </div>
@@ -642,197 +670,184 @@ function SidebarNav() {
 
               {/* Etapa 2: Mapear colunas */}
               {importStage === "mapping" && (
-                <div className="p-[20px] overflow-y-auto min-h-[400px] min-w-0 shrink-0">
-                  <div className="space-y-4 min-w-0">
-                    {/* Perfil de posição */}
-                    <div className="space-y-2 min-w-0">
-                      <label className="text-[11px] font-mono font-bold text-[#6F7379] uppercase tracking-[0.06em]">
-                        Perfil de posição
-                      </label>
-                      <Input
-                        placeholder="Ex: Goleiro, Zagueiro, Atacante..."
-                        value={importPlayerType}
-                        onChange={(e) => {
-                          setImportPlayerType(e.target.value);
-                          loadSavedMapping(e.target.value);
-                        }}
-                        className="w-full border border-input rounded-none bg-surface px-[12px] py-[10px] text-[12px] text-foreground outline-none focus:ring-1 focus:ring-primary"
-                      />
+                <div className="flex min-w-0 flex-col gap-[28px] p-[20px] sm:p-[24px]">
+                  {/* Perfil de posição */}
+                  <section className="flex min-w-0 flex-col gap-[8px]">
+                    <label className="text-[11px] font-mono font-bold text-[#6F7379] uppercase tracking-[0.06em]">
+                      Perfil de posição
+                    </label>
+                    <Input
+                      placeholder="Ex: Goleiro, Zagueiro, Atacante..."
+                      value={importPlayerType}
+                      onChange={(e) => {
+                        setImportPlayerType(e.target.value);
+                        loadSavedMapping(e.target.value);
+                      }}
+                      className="w-full border border-input rounded-none bg-surface px-[12px] py-[10px] text-[12px] text-foreground outline-none focus:ring-1 focus:ring-primary"
+                    />
+                  </section>
+
+                  {/* Campos de identificação */}
+                  <section className="flex min-w-0 flex-col gap-[12px]">
+                    <h3 className="font-mono text-[11px] font-bold uppercase tracking-[0.06em] text-[#6F7379]">
+                      Campos de identificação
+                    </h3>
+                    <div className="grid grid-cols-1 gap-x-[16px] gap-y-[14px] sm:grid-cols-2 lg:grid-cols-3">
+                      {ID_FIELDS.map((field) => (
+                        <div key={field.key} className="flex min-w-0 flex-col gap-[6px]">
+                          <div className="flex items-center gap-[6px]">
+                            <span className="font-mono text-[11px] font-bold text-[#6F7379]">
+                              {field.label}
+                            </span>
+                            {field.required && (
+                              <span className="text-[10px] text-[#C2501F] font-bold">*</span>
+                            )}
+                          </div>
+                          <ImportColumnSelect
+                            value={importIdMap[field.key]}
+                            onChange={(v) => setImportIdMap({ ...importIdMap, [field.key]: v })}
+                            columns={importColumns}
+                            disabledColumns={usedColumns}
+                            placeholder="Selecionar coluna"
+                            ariaLabel={field.label}
+                          />
+                        </div>
+                      ))}
                     </div>
+                  </section>
+
+                  {/* Avaliações */}
+                  <section className="flex min-w-0 flex-col gap-[12px]">
+                    <div className="flex flex-wrap items-center justify-between gap-x-[12px] gap-y-[4px]">
+                      <h3 className="font-mono text-[11px] font-bold uppercase tracking-[0.06em] text-[#6F7379]">
+                        As {METRIC_SLOTS} avaliações
+                      </h3>
+                      <span className="font-mono text-[11px] text-[#6F7379]">{mappedSummary}</span>
+                    </div>
+                    {!metricsAreSlots && (
+                      <p className="font-sans text-[11px] leading-[1.4] text-[#6F7379]">
+                        Informe o perfil de posição para configurar as {METRIC_SLOTS} avaliações.
+                      </p>
+                    )}
 
                     {/* Busca de colunas */}
-                    <div className="relative min-w-0 shrink-0">
-                      <Search className="absolute left-[10px] top-[9px] h-4 w-4 text-[#6F7379] shrink-0" />
+                    <div className="relative min-w-0">
+                      <Search className="pointer-events-none absolute left-[10px] top-[9px] h-4 w-4 text-[#6F7379]" />
                       <Input
                         placeholder="Pesquisar coluna..."
                         value={metricSearch}
                         onChange={(e) => setMetricSearch(e.target.value)}
-                        className="w-full pl-[28px] pr-[10px] py-[8px] border border-input rounded-none bg-surface text-[11px] text-foreground outline-none focus:ring-1 focus:ring-primary"
+                        className="h-[34px] w-full pl-[32px] pr-[10px] py-[8px] border border-input rounded-none bg-surface text-[11px] text-foreground outline-none focus:ring-1 focus:ring-primary"
                       />
                     </div>
 
-                    {/* Cabeçalho da tabela de mapeamento */}
-                    <div className="grid grid-cols-[32px_minmax(0,1.4fr)_minmax(0,1fr)_auto] gap-[12px] border-b border-[#E3E1DA] bg-[#F3F2EE] px-[16px] py-[10px] sticky top-[160px] z-[10] min-w-0 shrink-0">
-                      <div className="font-mono text-[11px] font-bold text-[#6F7379] uppercase text-center shrink-0">#</div>
-                      <div className="font-mono text-[11px] font-bold text-[#6F7379] uppercase shrink-0">COLUNA</div>
-                      <div className="font-mono text-[11px] font-bold text-[#6F7379] uppercase shrink-0">NOME CURTO</div>
-                      <div className="font-mono text-[11px] font-bold text-[#6F7379] uppercase shrink-0">MENOR É MELHOR</div>
-                    </div>
+                    <div className="min-w-0 border border-[#E3E1DA]">
+                      {/* Cabeçalho das colunas (mesmo template das linhas) */}
+                      <div
+                        className={`sticky top-0 z-[10] hidden border-b border-[#E3E1DA] bg-[#F3F2EE] py-[10px] md:grid ${METRIC_ROW_COLS}`}
+                      >
+                        <div className="text-center font-mono text-[11px] font-bold uppercase text-[#6F7379]">#</div>
+                        <div className="font-mono text-[11px] font-bold uppercase text-[#6F7379]">Coluna</div>
+                        <div className="font-mono text-[11px] font-bold uppercase text-[#6F7379]">Nome curto</div>
+                        <div className="text-right font-mono text-[11px] font-bold uppercase text-[#6F7379]">
+                          Menor é melhor
+                        </div>
+                      </div>
 
-                    {/* Campos de identificação */}
-                    <div className="grid grid-cols-[repeat(3,minmax(0,1fr))] gap-[16px] mb-[24px] min-w-0 shrink-0">
-                      {ID_FIELDS.map((field) => {
-                        const currentValue = importIdMap[field.key];
-                        const isUsedElsewhere =
-                          importMetrics.some((m) => m.column === currentValue && currentValue !== "") ||
-                          Object.values(importIdMap).some((v, idx) => v === currentValue && Object.keys(importIdMap)[idx] !== field.key);
-                        return (
-                          <div key={field.key} className="space-y-[6px] min-w-0 shrink-0">
-                            <div className="flex items-center gap-[6px] min-w-0 shrink-0">
-                              <span className="font-mono text-[11px] font-bold text-[#6F7379] shrink-0">
-                                {field.label}
-                              </span>
-                              {field.required && (
-                                <span className="text-[10px] text-[#C2501F] font-bold shrink-0">*</span>
-                              )}
-                            </div>
+                      {visibleMetrics.length === 0 && (
+                        <div className="px-[16px] py-[20px] text-center font-sans text-[12px] text-[#6F7379]">
+                          Nenhuma avaliação encontrada.
+                        </div>
+                      )}
+
+                      {visibleMetrics.map(({ slot, i }) => (
+                        <div
+                          key={i}
+                          className={`grid min-h-[52px] items-center border-b border-[#E3E1DA] py-[10px] last:border-b-0 ${METRIC_ROW_COLS}`}
+                        >
+                          <div className="text-center font-mono text-[11px] font-bold text-[#6F7379]">
+                            {String(i + 1).padStart(2, "0")}
+                          </div>
+                          <div className="min-w-0">
                             <ImportColumnSelect
-                              value={currentValue}
-                              onChange={(v) => setImportIdMap({ ...importIdMap, [field.key]: v })}
+                              value={slot.column}
+                              onChange={(v) => {
+                                const next = [...importMetrics];
+                                next[i] = { ...next[i], column: v, label: v ? slot.label || v : "" };
+                                setImportMetrics(next);
+                              }}
                               columns={importColumns}
                               disabledColumns={usedColumns}
                               placeholder="Selecionar coluna"
+                              ariaLabel={`Coluna da avaliação ${i + 1}`}
                             />
                           </div>
-                        );
-                      })}
+                          <div className="col-start-2 min-w-0 md:col-start-auto">
+                            <Input
+                              value={slot.label}
+                              onChange={(e) => {
+                                const next = [...importMetrics];
+                                next[i] = { ...next[i], label: e.target.value };
+                                setImportMetrics(next);
+                              }}
+                              placeholder="Nome curto no card"
+                              aria-label={`Nome curto da avaliação ${i + 1}`}
+                              className="h-[34px] w-full min-w-0 border border-input rounded-none bg-surface px-[10px] py-[8px] text-[11px] text-foreground outline-none focus:ring-1 focus:ring-primary"
+                            />
+                          </div>
+                          <label className="col-start-2 flex cursor-pointer items-center gap-[8px] md:col-start-auto md:justify-self-end">
+                            <input
+                              type="checkbox"
+                              checked={slot.invert}
+                              onChange={(e) => {
+                                const next = [...importMetrics];
+                                next[i] = { ...next[i], invert: e.target.checked };
+                                setImportMetrics(next);
+                              }}
+                              className="h-4 w-4 shrink-0 cursor-pointer rounded-none border border-input text-primary focus:ring-primary"
+                            />
+                            <span className="whitespace-nowrap font-mono text-[10px] text-[#6F7379] md:sr-only">
+                              Menor é melhor
+                            </span>
+                          </label>
+                        </div>
+                      ))}
                     </div>
-
-                    {/* 14 Avaliações */}
-                    <div className="space-y-[24px] min-w-0 shrink-0">
-                      <div className="flex items-center justify-between mb-[12px] min-w-0 shrink-0">
-                        <span className="font-mono text-[11px] font-bold text-[#6F7379] uppercase tracking-[0.06em]">
-                          As 14 avaliações
-                        </span>
-                        <span className="font-mono text-[11px] text-[#6F7379] shrink-0">
-                          {importMetrics.filter((m) => m.column).length} mapeadas
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-[32px_minmax(0,1.4fr)_minmax(0,1fr)_auto] gap-[12px] min-w-0 shrink-0">
-                        {importMetrics
-                          .filter((m) => {
-                            const term = normalize(metricSearch);
-                            return (
-                              !term ||
-                              normalize(m.label).includes(term) ||
-                              normalize(m.column).includes(term)
-                            );
-                          })
-                          .map((slot, i) => {
-                            const isUsedElsewhere =
-                              importIdMap.name === slot.column ||
-                              importIdMap.club === slot.column ||
-                              importIdMap.position === slot.column ||
-                              importIdMap.age === slot.column ||
-                              importIdMap.foot === slot.column ||
-                              importIdMap.nationality === slot.column ||
-                              importIdMap.height === slot.column ||
-                              importIdMap.salary === slot.column ||
-                              importIdMap.rating === slot.column ||
-                              importIdMap.fullGames === slot.column ||
-                              importIdMap.uid === slot.column ||
-                              importMetrics.some(
-                                (m, j) => j !== i && m.column === slot.column,
-                              );
-                            const displayLabel = slot.label || metricLabels[slot.column] || slot.column;
-                            return (
-                              <div
-                                key={i}
-                                className="grid grid-cols-[32px_minmax(0,1.4fr)_minmax(0,1fr)_auto] gap-[12px] items-center border-b border-[#E3E1DA] px-[16px] py-[13px] min-w-0 shrink-0 h-[52px]"
-                              >
-                                <div className="font-mono text-[11px] font-bold text-[#6F7379] text-center shrink-0">
-                                  {i + 1}
-                                </div>
-                                <div className="relative min-w-0 shrink-0">
-                                  <ImportColumnSelect
-                                    value={slot.column}
-                                    onChange={(v) => {
-                                      const next = [...importMetrics];
-                                      next[i] = { ...next[i], column: v, label: v ? slot.label || v : "" };
-                                      setImportMetrics(next);
-                                    }}
-                                    columns={importColumns}
-                                    disabledColumns={usedColumns}
-                                    placeholder="Selecionar coluna"
-                                  />
-                                </div>
-                                <div className="flex min-w-0 shrink-0">
-                                  <Input
-                                    value={slot.label}
-                                    onChange={(e) => {
-                                      const next = [...importMetrics];
-                                      next[i] = { ...next[i], label: e.target.value };
-                                      setImportMetrics(next);
-                                    }}
-                                    placeholder="Nome curto no card"
-                                    className="w-full border border-input rounded-none bg-surface px-[10px] py-[8px] text-[11px] text-foreground outline-none focus:ring-1 focus:ring-primary shrink-0"
-                                  />
-                                </div>
-                                <div className="flex items-center gap-[6px] min-w-0 shrink-0">
-                                  <label className="flex items-center gap-[2px] cursor-pointer shrink-0">
-                                    <input
-                                      type="checkbox"
-                                      checked={slot.invert}
-                                      onChange={(e) => {
-                                        const next = [...importMetrics];
-                                        next[i] = { ...next[i], invert: e.target.checked };
-                                        setImportMetrics(next);
-                                      }}
-                                      className="w-4 h-4 rounded-none border border-input text-primary focus:ring-primary"
-                                      readOnly
-                                      onClick={(e) => e.preventDefault()}
-                                    />
-                                    <span className="text-[10px] text-[#6F7379] font-mono shrink-0 whitespace-nowrap">
-                                      Menor é melhor
-                                    </span>
-                                  </label>
-                                </div>
-                                <div className="absolute inset-0 z-[20] opacity-0" />
-                              </div>
-                            );
-                          })}
-                      </div>
-                    </div>
-                  </div>
+                  </section>
                 </div>
               )}
             </div>
 
             {/* Rodapé fixo */}
-            <div className="border-t border-[#E3E1DA] px-[24px] py-[16px] bg-[#F3F2EE] flex items-center justify-between gap-[12px] shrink-0 min-w-0">
-              <button
-                onClick={() => setImportDialogOpen(false)}
-                className="flex h-[36px] items-center justify-center gap-[8px] rounded-none border border-[#E3E1DA] px-[16px] py-[8px] text-[11px] font-mono font-bold text-[#6F7379] hover:bg-[#F7F6F2] shrink-0"
-              >
-                Cancelar
-              </button>
-              <div className="flex items-center gap-[8px] shrink-0">
+            <div className="flex shrink-0 flex-wrap items-center justify-between gap-[12px] border-t border-[#E3E1DA] bg-[#F3F2EE] px-[24px] py-[14px]">
+              <div className="flex min-w-0 items-center gap-[16px]">
+                <button
+                  onClick={() => setImportDialogOpen(false)}
+                  className="flex h-[36px] shrink-0 items-center justify-center gap-[8px] rounded-none border border-[#E3E1DA] px-[16px] py-[8px] text-[11px] font-mono font-bold text-[#6F7379] hover:bg-[#F7F6F2]"
+                >
+                  Cancelar
+                </button>
+                {importStage === "mapping" && (
+                  <span className="hidden font-mono text-[11px] text-[#6F7379] sm:inline">{mappedSummary}</span>
+                )}
+              </div>
+              <div className="flex flex-wrap items-center justify-end gap-[12px]">
                 {importing ? (
-                  <span className="font-mono text-[11px] text-[#6F7379] shrink-0">Importando…</span>
+                  <span className="font-mono text-[11px] text-[#6F7379]">Importando…</span>
                 ) : (
                   <>
-                    <Button
-                      onClick={handleConfirmImport}
-                      disabled={importing || !importPlayerType || !importIdMap.name}
-                      className="flex h-[36px] items-center justify-center gap-[8px] rounded-none border-none px-[16px] py-[8px] bg-[#2F4BC0] text-white text-[11px] font-mono font-bold hover:bg-[#2F4BC0]/90 shrink-0"
-                    >
-                      Confirmar importação
-                    </Button>
                     {!importPlayerType || !importIdMap.name ? (
-                      <span className="text-[10px] text-[#C2501F] font-mono shrink-0 whitespace-nowrap">
+                      <span className="font-mono text-[10px] text-[#C2501F]">
                         {!importPlayerType ? "Informe o perfil de posição" : "Informe o campo Jogador"}
                       </span>
                     ) : null}
+                    <Button
+                      onClick={handleConfirmImport}
+                      disabled={importing || !importPlayerType || !importIdMap.name}
+                      className="flex h-[36px] shrink-0 items-center justify-center gap-[8px] rounded-none border-none px-[16px] py-[8px] bg-[#2F4BC0] text-white text-[11px] font-mono font-bold hover:bg-[#2F4BC0]/90"
+                    >
+                      Confirmar importação
+                    </Button>
                   </>
                 )}
               </div>
